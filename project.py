@@ -7,6 +7,11 @@ connection = None
 cursor = None
 
 
+
+
+
+
+
 def connect(path):
     global connection, cursor
 
@@ -50,6 +55,7 @@ def login():
     return user, cust
 
 
+
 def signup():
     '''
     Signs up a customer (their CID must be unique)
@@ -83,33 +89,6 @@ def signup():
     return cid
 
 
-def end_session(cid):
-    # End the session. The user should be able to end the current session. The duration should be set
-    #  in minutes to the time passed in minutes from the time the session started until the current time.
-    #   If the customer has been watching any movies, those will end 
-    # and the duration watched will be recorded. Again the duration watched cannot exceed the duration of the movie.
-
-    
-    
-  
-
-    # if len(curSessUser) > 1:
-    #     SessTBClosed = input('')
-
-
-    curSessMovies = '''
-    SELECT mid FROM WATCH where sid = :sid AND :cid = cid AND duration < 
-
-    '''
-
-    
-
-
-
-
-
-
-    connection.commit()
 
 
 
@@ -180,6 +159,29 @@ def system(user, cust):
     return 
 
 
+
+
+def create_session(cid):
+    '''
+    
+    '''
+    global connection, cursor
+
+    sid = int(datetime.now().strftime('%Y%m%d')[2:])
+
+    current_date = time.strftime("%d/%m/%y %H:%M:%S")
+    duration = None
+
+    cursor.execute('''
+    INSERT INTO sessions (sid, cid, sdate, duration) VALUES (:sid, :cid, :sdate, :duration);
+    ''', {'sid': sid, 'cid': cid, 'sdate':current_date, 'duration': duration})
+
+    #commit to save the changes
+    connection.commit()
+
+
+
+
 def search_movie(user):
     '''
     The customer should be able to provide one or more unique keywords, and the system should retrieve all movies that have any of those keywords 
@@ -202,47 +204,58 @@ def search_movie(user):
 
 
 
-def start_movie(user, mid, sid):
-    
-    pass
 
+def end_session(user, sid):
+    # End the session. The user should be able to end the current session. The duration should be set
+    #  in minutes to the time passed in minutes from the time the session started until the current time.
+    #   If the customer has been watching any movies, those will end 
+    # and the duration watched will be recorded. Again the duration watched cannot exceed the duration of the movie.
+
+    curSessMovies = '''
+        SELECT * 
+        FROM watch w, movies m 
+        WHERE sid = :sid AND :cid = cid 
+    '''
+    mov_watched = cursor.execute(curSessMovies, {"sid":sid, "cid":user})
+
+
+
+
+    # CODE TO CLOSE SESSION AFTER CLOSING THE MOVIE
+    
+    # sid, s_date = session[0], session[2]
+    # initial_datetime = datetime.strptime(s_date, "%d/%m/%y %H:%M:%S")
+    # current_datetime = datetime.now()
+    # duration = (current_datetime - initial_datetime).total_seconds()//60
+    
+    # update_session = """
+    #     UPDATE sessions
+    #     SET duration = :dur
+    #     WHERE cid = :cid AND sid = :sid
+    #     LIMIT 1
+    # """
+    # cursor.execute(update_session, {"dur": duration, "cid": user, "sid": sid})
+    # cursor.commit()
+
+
+
+
+
+
+    connection.commit()
 
 
 
 
 def end_movie(user, sid, mid):
     '''
-    Closes the movie (mid:int) being wated by the user (user:str) in session (sid:int)
+    Closes the movie (mid:int) being watched by the user (user:str) in session (sid:int)
     '''
     global connection, cursor
 
     # Find all 
 
     pass
-
-
-
-
-
-def create_session(cid):
-    '''
-    
-    '''
-    global connection, cursor
-
-    sid = int(datetime.now().strftime('%Y%m%d')[2:])
-
-    current_date = time.strftime("%Y-%m-%d %H:%M:%S")
-    duration = None
-
-    cursor.execute('''
-    INSERT INTO sessions (sid, cid, sdate, duration) VALUES (:sid, :cid, :sdate, :duration);
-    ''', {'sid': sid, 'cid': cid, 'sdate':current_date, 'duration': duration})
-
-    #commit to save the changes
-    connection.commit()
-
-
 
 
 
@@ -292,21 +305,37 @@ def add_movie():
                 print('Rejecting cast member...')
 
     print('')
-        
-        
-            
+
+
+
 
 
 def update_recommendations(user):
     pass
 
+
+
+
+
 def close_sessions(user):
     '''
     Closes all the user's sessions on log out
+    Input: user (str) - cid of the user
     '''
     global connection, cursor
-    
-    pass
+
+    getSessions = """
+        SELECT s.cid, s.sid 
+        FROM sessions s
+        WHERE s.cid = :cid AND duration = NULL;
+    """
+    userSessions = cursor.execute(getSessions, {"cid":user}).fetchall()
+
+    for session in userSessions:
+        # sessions(sid, cid, sdate, duration)
+        cid, sid = session
+        end_session(cid, sid)
+
 
 
 
