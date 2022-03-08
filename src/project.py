@@ -317,14 +317,17 @@ def close_sessions(user):
 
 
 
-
-def main():
+# custom_path used for testing
+def main(custom_path=None):
     global connection, cursor
 
     # uncomment once we have to present
     # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
-    db_path='./proj.db'
-    connect(db_path)
+    if custom_path is None:
+        db_path='./../proj.db'
+        connect(db_path)
+    else:
+        connect(custom_path)
 
     # open and execute tables.sql
     # ! we don't need this later on!
