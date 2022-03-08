@@ -306,8 +306,15 @@ def add_movie():
 
 
 
+
 def update_recommendations(user):
-    pass
+    '''
+    The editor should be able to select a monthly, an annual or an all-time report and see a listing of movie pairs m1, m2 such that some of the customers who have watched m1, have also watched m2 within the chosen period. Any such pair should be listed with the number of customers who have watched them within the chosen period, ordered from the largest to the smallest number, and with an indicator if the pair is in the recommended list and the score. The editor should be able to select a pair and (1) add it to the recommended list (if not there already) or update its score, or (2) delete a pair from the recommended list.
+    '''
+    global connection, cursor
+
+    
+
 
 def close_sessions(user):
     '''
