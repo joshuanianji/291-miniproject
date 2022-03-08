@@ -32,7 +32,7 @@ def login():
 
     while True:
         print('Please enter your user credentials')
-        user = input('Username: ').upper()
+        user = input('Username: ').lower()
         pwd = getpass()
         
         cursor.execute('SELECT * FROM customers WHERE lower(cid) = ? AND pwd = ?;', (user, pwd))
@@ -153,12 +153,12 @@ def system(user, cust):
         
         elif user_input == 'ES' and cust:
             curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration = NULL '''
-            cursor.execute(curSessUser, {'cid':cid})
+            # cursor.execute(curSessUser, {'cid':cid})
 
-            if len(curSessUser) > 1:
+            # if len(curSessUser) > 1:
                 
 
-            end_session(user, curSessUser)
+            # end_session(user, curSessUser)
             print('Ending session...')
         
         elif user_input == 'AM' and not cust:
