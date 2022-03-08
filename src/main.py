@@ -315,6 +315,22 @@ def close_sessions(user):
 
 
 
+def authenticate():
+    cid = None
+    cust = True
+    print('Welcome to the login page! Press "L" to login or "S" to signup')
+    while True:
+        user_input = input('Please enter your choice: ')
+        if user_input.lower() == 'l':
+            cid, cust = login()
+            break
+        elif user_input.lower() == 's':
+            cid = signup()
+            break
+        else:
+            print('Invalid input! Press "L" to login and "S" to signup')
+
+    return cid, cust
 
 
 # custom_path used for testing
@@ -324,7 +340,7 @@ def main(custom_path=None):
     # uncomment once we have to present
     # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
     if custom_path is None:
-        db_path='./../proj.db'
+        db_path='./proj.db'
         connect(db_path)
     else:
         connect(custom_path)
@@ -336,22 +352,8 @@ def main(custom_path=None):
     #     cursor.executescript(sql_as_string)
 
     # login page
-    cid = None
-    cust = True
-    print('Welcome to the login page! Press "L" to login or "S" to signup')
-    while True:
-        user_input = input('Please enter your choice: ').upper()
-        if user_input.lower() == 'l':
-            cid, cust = login()
-            break
-        elif user_input.lower() == 's':
-            cid = signup()
-            break
-        else:
-            print('Invalid input! Press "L" to login and "S" to signup')
-
-
-
+    cid, cust = authenticate()
+    
     #customerSessions('ABCD')
     # system page   
     system(cid, cust)
