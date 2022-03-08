@@ -2,6 +2,7 @@ import sqlite3
 import time
 from getpass import getpass
 from datetime import datetime
+import utils
 
 connection = None
 cursor = None
@@ -60,11 +61,7 @@ def signup():
     print('Welcome to the Movies291 signup page! Please enter your credentials you wish to use')
     
     while True:
-        cid = input('ID: ').upper()
-
-        if len(cid) != 4:
-            print('Please input an ID that is exactly 4 characters.')
-            continue
+        cid = utils.get_char_exact_len('ID (char 4): ').upper()
 
         cursor.execute('SELECT * FROM customers WHERE lower(cid) = ?;', (cid,))
         if cursor.fetchone():
@@ -163,7 +160,6 @@ def system(user, cust):
         
         elif user_input == 'AM' and not cust:
             add_movie()
-            print('Adding movie...')
         
         elif user_input == 'UR' and not cust:
             update_recommendations(user)
@@ -254,20 +250,34 @@ def add_movie():
     global connection, cursor
 
     print('Please enter the movie information')
-    mid = input('Movie ID: ').upper()
+    while True:
+        mid = utils.get_valid_int('Movie ID (int): ')
+
+        # Check if mid already exists
+        cursor.execute('SELECT mid FROM movies WHERE mid = ?;', (mid,))
+        if cursor.fetchone():
+            print('Movie with mid {} already exists!'.format(mid))
+        else:
+            break
     title = input('Title: ')
-    year = input('Year: ')
-    runtime = input('Runtime: ')
+    year = utils.get_valid_int('Year (int): ')
+    runtime = utils.get_valid_int('Runtime (int): ')
+
+    # Add movie
+    cursor.execute('INSERT INTO movies (mid, title, year, runtime) VALUES (?, ?, ?, ?);', (mid, title, year, runtime))
 
     print('Entering cast members. At any time, press "q" to quit and finish adding cast members.')
     while True:
-        pid = input('Cast member PID: ').upper()
+        pid = input('Cast member PID (char 4): ').upper()
         if pid == 'Q':
             print('Finishing adding cast members...')
             break
-        
+        elif len(pid) != 4:
+            print('Invalid PID! please enter 4 characters')
+            continue
+
         # look up member id 
-        cursor.execute('SELECT * FROM casts c, moviePeople mp WHERE c.mid=? AND c.pid = mp.pid', (mid,))
+        cursor.execute('SELECT * FROM moviePeople mp WHERE mp.pid = ?', (pid,))
         data = cursor.fetchone()
 
         # Cast member exists - add role
@@ -275,8 +285,9 @@ def add_movie():
             prompt = input('Confirm adding cast member {}, born in {}? (Y/N) '.format(data['name'], data['birthYear']))
             if prompt.upper() == 'Y':
                 role = input('Role: ')
-                cursor.execute('INSERT INTO casts VALUES (?, ?, ?);', (mid, pid, role))
+                cursor.execute('INSERT INTO casts (mid, pid, role) VALUES (?, ?, ?);', (mid, pid, role))
                 connection.commit()
+                print('Cast member {} added to {} with role {}!'.format(data['name'], title, role))
             else:
                 print('Rejecting cast member...')
         else:
@@ -291,10 +302,8 @@ def add_movie():
             else:
                 print('Rejecting cast member...')
 
-    print('')
-        
-        
-            
+    print('Added movie {}!'.format(title))
+
 
 
 def update_recommendations(user):
