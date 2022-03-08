@@ -315,29 +315,12 @@ def close_sessions(user):
 
 
 
-
-
-
-def main():
-    global connection, cursor
-
-    # uncomment once we have to present
-    # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
-    db_path='./proj.db'
-    connect(db_path)
-
-    # open and execute tables.sql
-    # ! we don't need this later on!
-    # with open("prj-tables.sql") as sql_file:
-    #     sql_as_string = sql_file.read()
-    #     cursor.executescript(sql_as_string)
-
-    # login page
+def authenticate():
     cid = None
     cust = True
     print('Welcome to the login page! Press "L" to login or "S" to signup')
     while True:
-        user_input = input('Please enter your choice: ').upper()
+        user_input = input('Please enter your choice: ')
         if user_input.lower() == 'l':
             cid, cust = login()
             break
@@ -347,8 +330,30 @@ def main():
         else:
             print('Invalid input! Press "L" to login and "S" to signup')
 
+    return cid, cust
 
 
+# custom_path used for testing
+def main(custom_path=None):
+    global connection, cursor
+
+    # uncomment once we have to present
+    # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
+    if custom_path is None:
+        db_path='./proj.db'
+        connect(db_path)
+    else:
+        connect(custom_path)
+
+    # open and execute tables.sql
+    # ! we don't need this later on!
+    # with open("prj-tables.sql") as sql_file:
+    #     sql_as_string = sql_file.read()
+    #     cursor.executescript(sql_as_string)
+
+    # login page
+    cid, cust = authenticate()
+    
     #customerSessions('ABCD')
     # system page   
     system(cid, cust)
