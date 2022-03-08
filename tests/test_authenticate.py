@@ -54,6 +54,21 @@ class TestMain(unittest.TestCase):
         self.mock_signup.assert_called_once()
         return
 
+    def test_auth_signup_failonce(self):
+        # https://stackoverflow.com/a/24897297
+        # input A, B, then S
+        self.mock_input.side_effect = ['A', 'B', 'S'] 
+        self.mock_signup.return_value = 'bced'
+
+        main.authenticate()
+
+        self.mock_print.assert_any_call('Welcome to the login page! Press "L" to login or "S" to signup')
+        self.mock_print.assert_any_call('Invalid input! Press "L" to login and "S" to signup')
+
+        self.mock_input.assert_called_with('Please enter your choice: ')
+        assert self.mock_input.call_count == 3
+
+        self.mock_signup.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
