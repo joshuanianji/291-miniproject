@@ -530,8 +530,8 @@ def add_movie():
 
     print('Entering cast members. Press "q" to quit and finish adding cast members.')
     while True:
-        pid = input('Cast member PID (char 4) or "q": ').upper()
-        if pid == 'Q':
+        pid = input('Cast member PID (char 4) or "q": ').lower()
+        if pid == 'q':
             print('Finishing adding cast members...')
             break
         elif len(pid) != 4:
@@ -539,7 +539,7 @@ def add_movie():
             continue
 
         # look up member id 
-        cursor.execute('SELECT * FROM moviePeople mp WHERE mp.pid = ?', (pid,))
+        cursor.execute('SELECT * FROM moviePeople mp WHERE lower(mp.pid) = ?', (pid,))
         data = cursor.fetchone()
 
         # Cast member exists - add role
