@@ -30,12 +30,6 @@ def connect(path):
     cursor = connection.cursor()
     cursor.execute(' PRAGMA foreign_keys=ON; ')
 
-    prettyprint = """
-    .headers on
-    .mode column
-    """
-    cursor.execute(prettyprint)
-
     connection.commit()
     return
 
