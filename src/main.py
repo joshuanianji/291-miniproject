@@ -127,17 +127,20 @@ def system(user, cust):
         elif user_input == 'EM' and cust:
             curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
             sessionId = cursor.execute(curSessUser, {'cid':user}).fetchone()
-            print(sessionId)
-            end_movie(user, sessionId)
+            print(sessionId[0])
+            end_movie(user, sessionId[0])
             print('Ending movie...')
         
         elif user_input == 'ES' and cust:
             curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
-            sessionId = cursor.execute(curSessUser, {'cid':user})
+            sessionId = cursor.execute(curSessUser, {'cid':user}).fetchone()
+            
+
 
             if len(curSessUser) > 1:
-                print(curSessUser)
-                end_session(user, curSessUser)
+                #print(curSessUser)
+                print(sessionId[0])
+                end_session(user, sessionId[0])
                 print('Ending session...')
             else:
                 print('You have no active sessions!')
@@ -443,7 +446,8 @@ def end_session(user, sid):
         WHERE s.sid = :sid AND s.cid = :cid
     '''
     s_date  = cursor.execute(find_session, {"sid":sid, "cid":user}).fetchone()
-
+    print(s_date[0])
+    s_date = s_date[0]
     dt_start = datetime.strptime(s_date, "%d/%m/%y %H:%M:%S")
     dt_current = datetime.now()
     duration = (dt_current - dt_start).total_seconds()//60
@@ -451,8 +455,7 @@ def end_session(user, sid):
     update_session = """
         UPDATE sessions
         SET duration = :dur
-        WHERE cid = :cid AND sid = :sid
-        LIMIT 1
+        WHERE cid = :cid AND sid = :sid;
     """
     cursor.execute(update_session, {"dur": duration, "cid": user, "sid": sid})
     connection.commit()
@@ -494,7 +497,6 @@ def end_movie(user, sid):
         UPDATE watch
         SET duration = :dur
         WHERE cid = :cid AND sid = :sid AND mid = :mid AND duration<0;
-        LIMIT 1
     """
     cursor.execute(update_watch, {"dur": watch_dur, "cid": user, "sid": sid, "mid":mid})
     connection.commit()
