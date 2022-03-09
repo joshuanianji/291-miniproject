@@ -141,13 +141,13 @@ def system(user, cust):
         
         elif user_input == 'ES' and cust:
             curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration = NULL;'''
-            cursor.execute(curSessUser, {'cid':cid})
+            cursor.execute(curSessUser, {'cid':user})
 
             if len(curSessUser) > 1:
-                
-
-            end_session(user, curSessUser)
-            print('Ending session...')
+                end_session(user, curSessUser)
+                print('Ending session...')
+            else:
+                print('You have no active sessions!')
         
         elif user_input == 'AM' and not cust:
             add_movie()
