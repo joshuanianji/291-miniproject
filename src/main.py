@@ -337,7 +337,7 @@ def search_movie(user):
                     if prompt == 'y':
                         print('Watching {}!'.format(selected_movie[1]['title']))
                         mid = selected_movie[0]
-                        start_movie(user, mid, session['sid'])
+                        start_movie(user, session['sid'], mid)
                     break
                 else:
                     # with cast members, session
@@ -347,7 +347,7 @@ def search_movie(user):
                     if prompt == '2':
                         print('Watching {}!'.format(selected_movie[1]['title']))
                         mid = selected_movie[0]
-                        start_movie(user, mid, session['sid'])
+                        start_movie(user, session['sid'], mid)
                         break
                     else:
                         print('Select a cast member by the index:')
