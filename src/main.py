@@ -70,7 +70,7 @@ def signup():
     print('Welcome to the Movies291 signup page! Please enter your credentials you wish to use')
     
     while True:
-        cid = utils.get_char_exact_len('ID (char 4): ', 4).upper()
+        cid = utils.get_char_exact_len('ID (char 4): ', 4).lower()
 
         cursor.execute('SELECT * FROM customers WHERE lower(cid) = ?;', (cid,))
         if cursor.fetchone():
@@ -723,10 +723,12 @@ def close_sessions(user):
     getSessions = """
         SELECT s.cid, s.sid 
         FROM sessions s
-        WHERE s.cid = :cid AND duration = NULL;
+        WHERE s.cid = :cid AND duration is NULL;
     """
     userSessions = cursor.execute(getSessions, {"cid":user}).fetchall()
-
+    
+    if not userSessions:
+        return
     for session in userSessions:
         # sessions(sid, cid, sdate, duration)
         cid, sid = session
