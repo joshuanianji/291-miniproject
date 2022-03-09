@@ -193,17 +193,189 @@ def search_movie(user):
     '''
     
     global connection, cursor
-    pass
+
+    keywords = input('Enter keywords: ').split()
+
+    # Gets the count of the keyword in the movie titles
+    QUERY = """
+    SELECT titles.mid, titles.title, m.year, m.runtime, ifnull(counter_title, 0) + ifnull(counter_names, 0) + ifnull(counter_roles, 0) as count 
+    FROM (
+        SELECT mid, title, ((LENGTH(title) - LENGTH(REPLACE(lower(title), lower(:keyword), ''))) / LENGTH(:keyword)) 
+        AS counter_title FROM movies
+    ) titles LEFT OUTER JOIN (
+        SELECT m.mid, m.title, SUM(query_counter) as counter_names
+        FROM moviePeople mp 
+            LEFT OUTER JOIN (SELECT pid, ((LENGTH(name) - LENGTH(REPLACE(lower(name), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from moviePeople) mpCounts USING (pid)
+            LEFT OUTER JOIN casts c USING (pid)
+            LEFT OUTER JOIN movies m USING (mid)
+        GROUP BY m.mid
+        HAVING m.mid IS NOT NULL
+    ) names USING (mid) LEFT OUTER JOIN (
+        SELECT m.mid, m.title, SUM(query_counter) as counter_roles
+        FROM casts c
+            LEFT OUTER JOIN (SELECT pid, mid, ((LENGTH(role) - LENGTH(REPLACE(lower(role), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from casts) castCounts ON (castCounts.pid = c.pid AND castCounts.mid = c.mid)
+            LEFT OUTER JOIN moviePeople mp USING (pid)
+            LEFT OUTER JOIN movies m USING (mid)
+        GROUP BY m.mid
+        HAVING m.mid IS NOT NULL
+    ) roles USING (mid) LEFT OUTER JOIN movies m USING (mid)
+    WHERE count > 0
+    """
+
+    results = {}
+
+    # execute query for all keywords
+    for keyword in keywords:
+        cursor.execute(
+            QUERY,
+            {'keyword': keyword},
+        )
+        data = cursor.fetchall()
+        for datum in data:
+            # OHHH YEAH THIS CODE MAKES ME WANT TO CRY
+            try:
+                results[datum['mid']]['count'] += datum['count']
+            except:
+                results[datum['mid']] = {
+                    'count': datum['count'],
+                    'title': datum['title'],
+                    'year': datum['year'],
+                    'runtime': datum['runtime'],
+                }
+    
+    sorted_results = sorted(results.items(), key=lambda x: x[1]['count'], reverse=True)
+
+    if len(sorted_results) == 0:
+        print('No results found')
+        return
+
+    i = 0 # keep track of where we are at the start of the list
+
+    # using a for loop to make our "more" movies loop
+    while True:
+        for _ in range(0,5):
+            elem = sorted_results[i][1]
+            print('{}: {} ({}): {}min'.format(i + 1, elem['title'], elem['year'], elem['runtime']))
+            i += 1
+            if i >= len(sorted_results):
+                break
+
+        # Different output depending on if there are more than 5 movies we can show
+        if i >= len(sorted_results):
+            print('Please select a movie by its index:')
+            user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= i)
+        else:
+            print('Please select a movie by its index or type "more":')
+            user_input = input('> ').lower()
+
+        if user_input == 'more' and i < len(sorted_results):
+            # Show more results
+            print('More results:')
+            continue
+        else:
+            # User selected a movie
+            n = int(user_input)
+            selected_movie = sorted_results[n-1]
+            print('Getting info for {} ({})'.format(selected_movie[1]['title'], selected_movie[1]['year']))
+
+            # get all cast members of the movie
+            QUERY = """
+            SELECT name, role, mp.pid 
+                FROM moviePeople mp
+                LEFT OUTER JOIN casts c USING (pid)
+                LEFT OUTER JOIN movies m USING (mid)
+                WHERE m.mid = :mid
+            """
+            cursor.execute(
+                QUERY,
+                {'mid': selected_movie[0]},
+            )
+            cast_members = cursor.fetchall()
+            print('Cast members:')
+            for cast_member in cast_members:
+                print('{} as {}'.format(cast_member['name'], cast_member['role']))
+            
+            if len(cast_members) == 0:
+                print('No cast members found')
+            
+            # get the number of customers who have watched the movie (watched over 50% of it)
+            QUERY = """
+            SELECT COUNT(*) as count 
+            FROM watch w, customers c, movies m
+            WHERE w.cid = c.cid AND w.mid = m.mid AND m.mid = :mid AND w.duration*2 >= m.runtime
+            """
+            cursor.execute(
+                QUERY,
+                {'mid': selected_movie[0]},
+            )
+            watched_count = cursor.fetchone()['count']
+            print('{} customer(s) have watched this movie'.format(watched_count))
+
+            # Check if the user has a session
+            cursor.execute(
+                'SELECT * FROM sessions WHERE cid=:cid AND DURATION IS NULL', 
+                {'cid': user }
+            )
+            session = cursor.fetchone()
+            # Cast member follow or movie watch (note: there are 4 cases)
+            if session is None:
+                if len(cast_members) == 0:
+                    # No cast memmbers, no session. Do nothing
+                    print('Note: you do not have a session, so you can only select a cast member to follow. Since there are no cast members, we will return to the main menu')
+                    break
+                else:
+                    # cast members, no session
+                    print('Note: you do not have a session, so you can only select a cast member to follow. Select a cast member by its index:')
+                    for i, x in enumerate(cast_members):
+                        print('{}: {} as {}'.format(i + 1, x['name'], x['role']))
+
+                    user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= len(cast_members))
+                    print('Following {}!'.format(cast_members[int(user_input) - 1]['name']))
+                    pid = cast_members[int(user_input) - 1]['pid']
+                    follow_cast_member(user, pid)
+                    break
+            else:
+                if len(cast_members) == 0:
+                    # No cast members, session. Can only watch the movie
+                    prompt = utils.get_in_list('Watch the movie? (y/n)', ['y', 'n'])
+                    if prompt == 'y':
+                        print('Watching {}!'.format(selected_movie[1]['title']))
+                        mid = selected_movie[0]
+                        start_movie(user, mid, session['sid'])
+                    break
+                else:
+                    # with cast members, session
+                    print('Type "1" to select a cast member and follow, and "2" to watch this movie')
+                    prompt = utils.get_in_list('> ', ['1', '2'])
+                    print('Received: {}'.format(prompt))
+                    if prompt == '2':
+                        print('Watching {}!'.format(selected_movie[1]['title']))
+                        mid = selected_movie[0]
+                        start_movie(user, mid, session['sid'])
+                        break
+                    else:
+                        print('Select a cast member by the index:')
+                        for i, x in enumerate(cast_members):
+                            print('{}: {} as {}'.format(i + 1, x['name'], x['role']))
+
+                        user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= len(cast_members))
+                        print('Following {}!'.format(cast_members[int(user_input) - 1]['name']))
+                        pid = cast_members[int(user_input) - 1]['pid']
+                        follow_cast_member(user, pid)
+                        break
+
+    print('Returning to main menu...')
 
 
 
 
 def start_movie(user, mid, sid):
-    
+    print('watching movie {}!'.format(mid))    
     pass
 
 
-
+def follow_cast_member(cid, pid):
+    pass
 
 
 def end_movie(user, sid, mid):
@@ -349,16 +521,20 @@ def main(custom_path=None):
     # uncomment once we have to present
     # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
     if custom_path is None:
-        db_path='./proj.db'
+        db_path='./public.db'
         connect(db_path)
     else:
         connect(custom_path)
 
     # open and execute tables.sql
     # ! we don't need this later on!
-    # with open("prj-tables.sql") as sql_file:
-    #     sql_as_string = sql_file.read()
-    #     cursor.executescript(sql_as_string)
+    with open("prj-tables.sql") as sql_file:
+        sql_as_string = sql_file.read()
+        cursor.executescript(sql_as_string)
+
+    with open("public_data.sql") as sql_file:
+        sql_as_string = sql_file.read()
+        cursor.executescript(sql_as_string)
 
     # login page
     cid, cust = authenticate()
@@ -372,3 +548,7 @@ def main(custom_path=None):
 
 if __name__ == "__main__":
     main()
+    # db_path='./proj.db'
+    # connect(db_path)
+
+    # search_movie('bced')
