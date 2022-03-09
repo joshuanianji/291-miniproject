@@ -101,6 +101,7 @@ def system(user, cust):
 
     while True:
         user_input = input('> ').upper()
+        Cssid = None
         if user_input == 'H':
             if cust:
                 print('You can:')
@@ -117,20 +118,22 @@ def system(user, cust):
         
         elif user_input == 'SS' and cust:
             print('Starting session...')
-            create_session(user)
+            Cssid = create_session(user)
         
         elif user_input == 'SM' and cust:
             print('Searching for movie...')
             search_movie(user)
         
         elif user_input == 'EM' and cust:
-            
-            end_movie(user)
+            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
+            sessionId = cursor.execute(curSessUser, {'cid':user}).fetchone()
+            print(sessionId)
+            end_movie(user, sessionId)
             print('Ending movie...')
         
         elif user_input == 'ES' and cust:
-            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration = NULL;'''
-            cursor.execute(curSessUser, {'cid':user})
+            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
+            sessionId = cursor.execute(curSessUser, {'cid':user})
 
             if len(curSessUser) > 1:
                 print(curSessUser)
@@ -173,6 +176,8 @@ def create_session(cid):
 
     #commit to save the changes
     connection.commit()
+
+    return sid
 
 
 def search_movie(user):
@@ -378,11 +383,10 @@ def start_movie(cid, sid, mid):
         FROM watch 
         WHERE cid=:cid
             AND sid=:sid 
-            AND mid=:mid 
             AND duration<0;
         '''
-    if cursor.execute(check_watch, {'sid':sid, 'cid':cid, 'mid':mid}).fetchone():
-        print("You are already watching the movie!")
+    if cursor.execute(check_watch, {'sid':sid, 'cid':cid}).fetchone():
+        print("You are already watching a movie!. Please end that movie first")
         return
 
     current = datetime.now()
@@ -429,6 +433,7 @@ def end_session(user, sid):
     # watch(sid, cid, mid, duration)
     # sessions(sid, cid, sdate, duration)
 
+    print(user, sid)
     end_movie(user, sid)
 
     # CLOSE SESSION AFTER CLOSING THE MOVIE
@@ -471,6 +476,7 @@ def end_movie(user, sid):
         WHERE w.sid = :sid AND w.cid = :cid AND w.duration < 0;
     '''
     mid, dur = 0,0
+    print(sid)
     checkR = cursor.execute(movie_watching, {"sid":sid, "cid":user}).fetchone()
     if not checkR:
         print('No Movie being watched')
