@@ -61,7 +61,7 @@ def signup():
     print('Welcome to the Movies291 signup page! Please enter your credentials you wish to use')
     
     while True:
-        cid = utils.get_char_exact_len('ID (char 4): ').upper()
+        cid = utils.get_char_exact_len('ID (char 4): ', 4).upper()
 
         cursor.execute('SELECT * FROM customers WHERE lower(cid) = ?;', (cid,))
         if cursor.fetchone():
@@ -226,7 +226,7 @@ def create_session(cid):
     '''
     global connection, cursor
 
-    sid = int(datetime.now().strftime('%Y%m%d')[2:])
+    sid = int(datetime.now().strftime('%Y%m%d%H%M%S'))
 
     current_date = time.strftime("%Y-%m-%d %H:%M:%S")
     duration = None
