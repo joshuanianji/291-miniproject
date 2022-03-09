@@ -2,6 +2,9 @@ import sqlite3
 import time
 from getpass import getpass
 from datetime import datetime
+import utils
+import sys
+
 
 connection = None
 cursor = None
@@ -18,9 +21,6 @@ cursor = None
 # editors(eid, pwd)
 
 
-
-
-
 def connect(path):
     global connection, cursor
 
@@ -33,20 +33,16 @@ def connect(path):
     return
 
 
-
-
-
 def login():
     '''
     Returns ID of a user, and whether the user is a customer or not
-
     Keeps prompting for user credentials until a valid user is found.
     '''
     global connection, cursor
 
     while True:
         print('Please enter your user credentials')
-        user = input('Username: ').upper()
+        user = input('Username: ').lower()
         pwd = getpass()
         
         cursor.execute('SELECT * FROM customers WHERE lower(cid) = ? AND pwd = ?;', (user, pwd))
@@ -68,18 +64,13 @@ def login():
 def signup():
     '''
     Signs up a customer (their CID must be unique)
-
     Returns the ID of the customer
     '''
     global connection, cursor 
     print('Welcome to the Movies291 signup page! Please enter your credentials you wish to use')
     
     while True:
-        cid = input('ID: ').lower()
-
-        if len(cid) != 4:
-            print('Please input an ID that is exactly 4 characters.')
-            continue
+        cid = utils.get_char_exact_len('ID (char 4): ').upper()
 
         cursor.execute('SELECT * FROM customers WHERE lower(cid) = ?;', (cid,))
         if cursor.fetchone():
@@ -96,8 +87,6 @@ def signup():
 
     print('Signup successful! Redirecting you to System page...')
     return cid
-
-
 
 
 
@@ -151,11 +140,9 @@ def system(user, cust):
         
         elif user_input == 'AM' and not cust:
             add_movie()
-            print('Adding movie...')
-        
+
         elif user_input == 'UR' and not cust:
             update_recommendations(user)
-            print('Updating recommendation...')
         
         elif user_input == 'LO':
             print('Logging out...')
@@ -166,8 +153,6 @@ def system(user, cust):
             print('Invalid input! Type "H" for help')
 
     return 
-
-
 
 
 def create_session(cid):
@@ -189,8 +174,6 @@ def create_session(cid):
     connection.commit()
 
 
-
-
 def search_movie(user):
     '''
     The customer should be able to provide one or more unique keywords, and the system should retrieve all movies that have any of those keywords 
@@ -206,12 +189,180 @@ def search_movie(user):
     
     On a movie screen, the customer should have the options (1) to select a cast member and follow it, and (2) to start watching the movie.
     '''
+
     global connection, cursor
-    
-    
-    pass
 
+    keywords = input('Enter keywords: ').split()
 
+    # Gets the count of the keyword in the movie titles
+    QUERY = """
+    SELECT titles.mid, titles.title, m.year, m.runtime, ifnull(counter_title, 0) + ifnull(counter_names, 0) + ifnull(counter_roles, 0) as count 
+    FROM (
+        SELECT mid, title, ((LENGTH(title) - LENGTH(REPLACE(lower(title), lower(:keyword), ''))) / LENGTH(:keyword)) 
+        AS counter_title FROM movies
+    ) titles LEFT OUTER JOIN (
+        SELECT m.mid, m.title, SUM(query_counter) as counter_names
+        FROM moviePeople mp 
+            LEFT OUTER JOIN (SELECT pid, ((LENGTH(name) - LENGTH(REPLACE(lower(name), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from moviePeople) mpCounts USING (pid)
+            LEFT OUTER JOIN casts c USING (pid)
+            LEFT OUTER JOIN movies m USING (mid)
+        GROUP BY m.mid
+        HAVING m.mid IS NOT NULL
+    ) names USING (mid) LEFT OUTER JOIN (
+        SELECT m.mid, m.title, SUM(query_counter) as counter_roles
+        FROM casts c
+            LEFT OUTER JOIN (SELECT pid, mid, ((LENGTH(role) - LENGTH(REPLACE(lower(role), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from casts) castCounts ON (castCounts.pid = c.pid AND castCounts.mid = c.mid)
+            LEFT OUTER JOIN moviePeople mp USING (pid)
+            LEFT OUTER JOIN movies m USING (mid)
+        GROUP BY m.mid
+        HAVING m.mid IS NOT NULL
+    ) roles USING (mid) LEFT OUTER JOIN movies m USING (mid)
+    WHERE count > 0
+    """
+
+    results = {}
+
+    # execute query for all keywords
+    for keyword in keywords:
+        cursor.execute(
+            QUERY,
+            {'keyword': keyword},
+        )
+        data = cursor.fetchall()
+        for datum in data:
+            # OHHH YEAH THIS CODE MAKES ME WANT TO CRY
+            try:
+                results[datum['mid']]['count'] += datum['count']
+            except:
+                results[datum['mid']] = {
+                    'count': datum['count'],
+                    'title': datum['title'],
+                    'year': datum['year'],
+                    'runtime': datum['runtime'],
+                }
+    
+    sorted_results = sorted(results.items(), key=lambda x: x[1]['count'], reverse=True)
+
+    if len(sorted_results) == 0:
+        print('No results found')
+        return
+
+    i = 0 # keep track of where we are at the start of the list
+
+    # using a for loop to make our "more" movies loop
+    while True:
+        for _ in range(0,5):
+            elem = sorted_results[i][1]
+            print('{}: {} ({}): {}min'.format(i + 1, elem['title'], elem['year'], elem['runtime']))
+            i += 1
+            if i >= len(sorted_results):
+                break
+
+        # Different output depending on if there are more than 5 movies we can show
+        if i >= len(sorted_results):
+            print('Please select a movie by its index:')
+            user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= i)
+        else:
+            print('Please select a movie by its index or type "more":')
+            user_input = input('> ').lower()
+
+        if user_input == 'more' and i < len(sorted_results):
+            # Show more results
+            print('More results:')
+            continue
+        else:
+            # User selected a movie
+            n = int(user_input)
+            selected_movie = sorted_results[n-1]
+            print('Getting info for {} ({})'.format(selected_movie[1]['title'], selected_movie[1]['year']))
+
+            # get all cast members of the movie
+            QUERY = """
+            SELECT name, role, mp.pid 
+                FROM moviePeople mp
+                LEFT OUTER JOIN casts c USING (pid)
+                LEFT OUTER JOIN movies m USING (mid)
+                WHERE m.mid = :mid
+            """
+            cursor.execute(
+                QUERY,
+                {'mid': selected_movie[0]},
+            )
+            cast_members = cursor.fetchall()
+            print('Cast members:')
+            for cast_member in cast_members:
+                print('{} as {}'.format(cast_member['name'], cast_member['role']))
+            
+            if len(cast_members) == 0:
+                print('No cast members found')
+            
+            # get the number of customers who have watched the movie (watched over 50% of it)
+            QUERY = """
+            SELECT COUNT(*) as count 
+            FROM watch w, customers c, movies m
+            WHERE w.cid = c.cid AND w.mid = m.mid AND m.mid = :mid AND w.duration*2 >= m.runtime
+            """
+            cursor.execute(
+                QUERY,
+                {'mid': selected_movie[0]},
+            )
+            watched_count = cursor.fetchone()['count']
+            print('{} customer(s) have watched this movie'.format(watched_count))
+
+            # Check if the user has a session
+            cursor.execute(
+                'SELECT * FROM sessions WHERE cid=:cid AND DURATION IS NULL', 
+                {'cid': user }
+            )
+            session = cursor.fetchone()
+            # Cast member follow or movie watch (note: there are 4 cases)
+            if session is None:
+                if len(cast_members) == 0:
+                    # No cast memmbers, no session. Do nothing
+                    print('Note: you do not have a session, so you can only select a cast member to follow. Since there are no cast members, we will return to the main menu')
+                    break
+                else:
+                    # cast members, no session
+                    print('Note: you do not have a session, so you can only select a cast member to follow. Select a cast member by its index:')
+                    for i, x in enumerate(cast_members):
+                        print('{}: {} as {}'.format(i + 1, x['name'], x['role']))
+
+                    user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= len(cast_members))
+                    print('Following {}!'.format(cast_members[int(user_input) - 1]['name']))
+                    pid = cast_members[int(user_input) - 1]['pid']
+                    follow_cast_member(user, pid)
+                    break
+            else:
+                if len(cast_members) == 0:
+                    # No cast members, session. Can only watch the movie
+                    prompt = utils.get_in_list('Watch the movie? (y/n)', ['y', 'n'])
+                    if prompt == 'y':
+                        print('Watching {}!'.format(selected_movie[1]['title']))
+                        mid = selected_movie[0]
+                        start_movie(user, mid, session['sid'])
+                    break
+                else:
+                    # with cast members, session
+                    print('Type "1" to select a cast member and follow, and "2" to watch this movie')
+                    prompt = utils.get_in_list('> ', ['1', '2'])
+                    print('Received: {}'.format(prompt))
+                    if prompt == '2':
+                        print('Watching {}!'.format(selected_movie[1]['title']))
+                        mid = selected_movie[0]
+                        start_movie(user, mid, session['sid'])
+                        break
+                    else:
+                        print('Select a cast member by the index:')
+                        for i, x in enumerate(cast_members):
+                            print('{}: {} as {}'.format(i + 1, x['name'], x['role']))
+
+                        user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= len(cast_members))
+                        print('Following {}!'.format(cast_members[int(user_input) - 1]['name']))
+                        pid = cast_members[int(user_input) - 1]['pid']
+                        follow_cast_member(user, pid)
+                        break
+
+    print('Returning to main menu...')
 
 
 def start_movie(cid, sid, mid):
@@ -244,7 +395,6 @@ def start_movie(cid, sid, mid):
 
 
 
-
 def follow_cast_member(cid, pid):
     # follows(cid, pid)
     global cursor, connection
@@ -255,7 +405,7 @@ def follow_cast_member(cid, pid):
         WHERE cid=:cid
             AND pid=:pid;
         '''
-    if cursor.execute(check_watch, {'cid':cid, 'pid':pid}).fetchone():
+    if cursor.execute(check_follows, {'cid':cid, 'pid':pid}).fetchone():
         print("You are already following that cast member!")
         return
 
@@ -265,8 +415,6 @@ def follow_cast_member(cid, pid):
     cursor.execute(start_watching, {'cid':cid, 'pid':pid})
     connection.commit()
     return
-
-
 
 
 def end_session(user, sid):
@@ -286,7 +434,7 @@ def end_session(user, sid):
         FROM sessions s
         WHERE s.sid = :sid AND w.cid = :cid
     '''
-    s_date  = cursor.execute(curSessMovies, {"sid":sid, "cid":user, "mid":mid}).fetchone()
+    s_date  = cursor.execute(find_session, {"sid":sid, "cid":user}).fetchone()
 
     dt_start = datetime.strptime(s_date, "%d/%m/%y %H:%M:%S")
     dt_current = datetime.now()
@@ -300,8 +448,6 @@ def end_session(user, sid):
     """
     cursor.execute(update_session, {"dur": duration, "cid": user, "sid": sid})
     connection.commit()
-
-
 
 
 def end_movie(user, sid):
@@ -342,64 +488,71 @@ def end_movie(user, sid):
     return
 
 
-
-
 def add_movie():
     '''
-    The editor should be able to add a movie by providing a unique movie id, a title, a year, a runtime and a list of cast members and their roles. To add a cast member, the editor will enter the id of the cast member, and your system will look up the member and will display the name and the birth year. The editor can confirm and provide the cast member role or reject the cast member. 
-    If the cast member does not exist, the editor should be able to add the member by providing a unique id, a name and a birth year.
+    The editor should be able to add a movie by providing a unique movie id, a title, a year, a runtime and a list of cast members and their roles. To add a cast member, the editor will enter the id of the cast member, and your system will look up the member and will display the name and the birth year. The editor can confirm and provide the cast member role or reject the cast member. If the cast member does not exist, the editor should be able to add the member by providing a unique id, a name and a birth year.
     '''
     global connection, cursor
 
     print('Please enter the movie information')
-    mid = input('Movie ID: ').upper()
-    title = input('Title: ')
-    year = input('Year: ')
-    runtime = input('Runtime: ')
-
-    print('Entering cast members. At any time, press "q" to quit and finish adding cast members.')
     while True:
-        pid = input('Cast member PID: ').upper()
+        mid = utils.get_valid_int('Movie ID (int): ')
+
+        # Check if mid already exists
+        cursor.execute('SELECT mid FROM movies WHERE mid = ?;', (mid,))
+        if cursor.fetchone():
+            print('Movie with mid {} already exists!'.format(mid))
+        else:
+            break
+    title = input('Title: ')
+    year = utils.get_valid_int('Year (int): ')
+    runtime = utils.get_valid_int('Runtime (int): ')
+
+    # Add movie
+    cursor.execute('INSERT INTO movies (mid, title, year, runtime) VALUES (?, ?, ?, ?);', (mid, title, year, runtime))
+    connection.commit()
+
+    print('Entering cast members. Press "q" to quit and finish adding cast members.')
+    while True:
+        pid = input('Cast member PID (char 4) or "q": ').upper()
         if pid == 'Q':
             print('Finishing adding cast members...')
             break
-        
+        elif len(pid) != 4:
+            print('Invalid PID! please enter 4 characters')
+            continue
+
         # look up member id 
-        cursor.execute('SELECT * FROM casts c, moviePeople mp WHERE c.mid=? AND c.pid = mp.pid;', (mid,))
+        cursor.execute('SELECT * FROM moviePeople mp WHERE mp.pid = ?', (pid,))
         data = cursor.fetchone()
 
         # Cast member exists - add role
         if data:
-            prompt = input('Confirm adding cast member {}, born in {}? (Y/N) '.format(data['name'], data['birthYear']))
+            prompt = utils.get_in_list('Confirm adding cast member {}, born in {}? (Y/N) '.format(data['name'], data['birthYear']), ['Y', 'N'])
             if prompt.upper() == 'Y':
                 role = input('Role: ')
-                cursor.execute('INSERT INTO casts VALUES (?, ?, ?);', (mid, pid, role))
+                cursor.execute('INSERT INTO casts (mid, pid, role) VALUES (?, ?, ?);', (mid, pid, role))
                 connection.commit()
+                print('Cast member {} added to {} with role {}!'.format(data['name'], title, role))
             else:
                 print('Rejecting cast member...')
         else:
             # Cast member does not exist - add member
-            prompt = input('Cast member not found, create a new cast member with pid {}? (Y/N) '.format(pid)).upper()
-            if prompt == 'Y':
+            prompt = utils.get_in_list('Cast member not found, create a new cast member with pid {}? (Y/N) '.format(pid), ['Y', 'N'])
+            if prompt == 'y':
                 name = input('Name: ')
                 birthYear = input('Birth Year: ')
                 cursor.execute('INSERT INTO moviePeople VALUES (?, ?, ?);', (pid, name, birthYear))
                 connection.commit()
-                print('Cast member {} with ID {} added! You can now add it to the movie.'.format(name, pid))
+                print('Cast member {} with ID {} created! You can now add it to the movie.'.format(name, pid))
             else:
                 print('Rejecting cast member...')
 
-    print('')
-
-
-
+    print('Added movie {}!'.format(title))
 
 
 def update_recommendations(user):
     pass
-
-
-
 
 
 def close_sessions(user):
@@ -422,36 +575,12 @@ def close_sessions(user):
         end_session(cid, sid)
 
 
-
-
-
-
-
-
-
-
-
-
-def main():
-    global connection, cursor
-
-    # uncomment once we have to present
-    # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
-    db_path='./proj.db'
-    connect(db_path)
-
-    # open and execute tables.sql
-    # ! we don't need this later on!
-    # with open("prj-tables.sql") as sql_file:
-    #     sql_as_string = sql_file.read()
-    #     cursor.executescript(sql_as_string)
-
-    # login page
+def authenticate():
     cid = None
     cust = True
     print('Welcome to the login page! Press "L" to login or "S" to signup')
     while True:
-        user_input = input('Please enter your choice: ').upper()
+        user_input = input('Please enter your choice: ')
         if user_input.lower() == 'l':
             cid, cust = login()
             break
@@ -461,11 +590,28 @@ def main():
         else:
             print('Invalid input! Press "L" to login and "S" to signup')
 
+    return cid, cust
 
-    # system page
+
+# custom_path used for testing
+def main():
+    db_path = sys.argv[1] if len(sys.argv) > 1 else './public.db'
+
+    print('Reading DB from "{}"'.format(db_path))
+    connect(db_path)
+
+    # open and execute tables.sql
+    # ! we don't need this later on!
+    # with open("prj-tables.sql") as sql_file:
+    #     sql_as_string = sql_file.read()
+    #     cursor.executescript(sql_as_string)
+
+    # login page
+    cid, cust = authenticate()
+
+    # main logic
     system(cid, cust)
-
-    return 0
+    return
 
 
 if __name__ == "__main__":
