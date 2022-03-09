@@ -324,74 +324,19 @@ def update_recommendations(user):
 
 
      #if score is 0 that means movie2 is not in recommended list of movie1
-    query= ''' SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
-    FROM
-    (
-    (
-        SELECT w1.mid as m1, w2.mid as m2, strftime('%m', s1.sdate) as sdate, w1.cid as cid
-        FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
-        WHERE strftime('%m', s1.sdate) = strftime('%m', s2.sdate)
-            AND s1.cid = s2.cid
-            AND w1.sid = s1.sid
-            AND w1.cid = s1.cid
-            AND w2.sid = s2.sid
-            AND w2.cid = s2.cid
-            AND w1.mid !=  w2.mid
-            AND w1.mid = m1.mid
-            AND w2.mid = m2.mid
-            ANd 2*w1.duration > m1.runtime
-            AND 2*w2.duration > m2.runtime
-    ) t1
-    LEFT OUTER JOIN
-    (
-        SELECT r.watched as m1, r.recommended as recommend, r.score as score
-        from recommendations r
-    ) t2 
-    ON (t1.m1 = t2.m1 AND t2.recommend = t1.m2)
-    )
-    GROUP BY t1.m1, t1.m2, strftime('%m', t1.sdate)
-    ORDER BY c  DESC; '''
 
 
-    qery2 = '''
+    query =  '''
+
      SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
- FROM
- (
- (
-         SELECT w1.mid as m1, w2.mid as m2, strftime('%Y', s1.sdate) as sdate, w1.cid as cid
-         FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
-         WHERE strftime('%Y', s1.sdate) = strftime('%Y', s2.sdate)
-             AND s1.cid = s2.cid
-             AND w1.sid = s1.sid
-             AND w1.cid = s1.cid
-             AND w2.sid = s2.sid
-             AND w2.cid = s2.cid
-             AND w1.mid != w2.mid
-             AND w1.mid = m1.mid
-             AND w2.mid = m2.mid
-             ANd 2*w1.duration >= m1.runtime
-             AND 2*w2.duration >=m2.runtime
-     ) t1
-     LEFT OUTER JOIN
-     (
-        SELECT r.watched as m1, r.recommended as recommend, r.score as score
-         from recommendations r
-     ) t2 
-     ON (t1.m1 = t2.m1 AND t2.recommend = t1.m2)
- )
- GROUP BY t1.m1, t1.m2, strftime('%Y', t1.sdate)
- ORDER BY c  DESC;
-    '''
-
-    #if score is 0 that means movie2 is not in recommended list of movie1
-    allTimeQuery =  '''
-   SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
  FROM
  (
  ( 
          SELECT w1.mid as m1, w2.mid as m2,  w1.cid as cid 
          FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
           WHERE  s1.cid = s2.cid
+		    AND JULIANDAY('now') - JULIANDAY(s1.sdate) <= :time
+			AND JULIANDAY('now') - JULIANDAY(s2.sdate) <= :time
              AND w1.sid = s1.sid
              AND w1.cid = s1.cid
              AND w2.sid = s2.sid
@@ -410,21 +355,74 @@ def update_recommendations(user):
      ON (t1.m1 = t2.m1 AND t2.recommend = t1.m2)
  )
  GROUP BY t1.m1, t1.m2
- ORDER BY c  DESC;'''
+ ORDER BY c  DESC; 
+    '''
 
-    query2 = '''
-    SELECT * FROM sessions'''
     rows = ''
     if (choice == 'm'):
         k = 'm'
-        rows = cursor.execute(query).fetchall()
+        rows = cursor.execute(query, {'time': 30}).fetchall()
     elif choice == 'a':
         k = 'Y'
-        rows = cursor.execute(qery2).fetchall()
+        rows = cursor.execute(query, {'time': 365}).fetchall()
     else:
-        rows = cursor.execute(allTimeQuery).fetchall()
-    for row in rows:
-        print(row[0], row[1], row[2], row[3])
+        rows = cursor.execute(query, {'time': 2**10}).fetchall()
+    
+    if len(rows) < 1:
+        print("Theres no report to show at this time.")
+    else:
+        for row in rows:
+            print(row[0], row[1], row[2], row[3])
+            input_string = f"Press 'a' for adding the movie pair to recommended list, 'u' to update score and 'd' to delete the movie pair from recommended list \nWhat do you want to do with row where movie1 = {row[0]}, movie2 = {row[1]},\n and the number of customers who have watched it within the specified time period = {row[2]}"
+            if row[3] == 0:
+                input_string += f"and movie2 = {row[1]} is not in the recommended list of movie1({row[0]})"
+            else:
+                input_string += f"and movie2 ({row[1]})  is in the recommended list of movie1({row[0]}, with the score of {row[3]}"
+            while True:
+                Echoice = input(input_string).lower()
+                if Echoice == 'a' or Echoice == 'd' or Echoice == 'u':
+                    break
+                print('Wrong Input\n')
+            
+            if Echoice == 'a':
+                if row[3] != 0:
+                    print('movie pair is already in recommended list\n')
+                else:
+                    score = input('Whats the score you want to associate for this?')
+                    #Have to add a float check and a 0 < float <= 1 check
+                    updateRecommQuery = '''
+                    INSERT INTO recommendations VALUES(:m1, :m2, :score);
+                    '''
+                    cursor.execute(updateRecommQuery, {'m1': int(row[0]), 'm2': int(row[1]), 'score': float(score)})
+                    #, 
+                    
+            elif Echoice == 'd':
+                if row[3] != 0:
+                    delQuery = '''
+                    DELETE FROM recommendations
+                    WHERE watched = :m1 AND recommended = :m2;
+                    '''
+                    cursor.execute(delQuery, {'m1': int(row[0]), 'm2': int(row[1])})
+            
+            elif Echoice == 'u':
+                if row[3] == 0:
+                    print("Query couldn't be updated")
+                else:
+                    upQuery = '''
+                    UPDATE recommendations
+                    SET score = :sco
+                    WHERE watched = :m1 AND recommended = :m2;
+                    '''
+                    newScore = float(input('Enter the desired new score\n'))
+                    cursor.execute(upQuery, {'m1': int(row[0]), 'm2': int(row[1]), 'sco': newScore})
+
+
+
+    connection.commit()
+
+            
+
+
     #Have to work on rest of the functionality for 
     
 
