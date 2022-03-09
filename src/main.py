@@ -175,6 +175,12 @@ def system(user, cust):
 
     return 
 
+def add_throuple(x, y, z):
+    '''
+    Adds three numbers together
+    used in search_movies to add up values of the three separate tables
+    '''
+    return x + y + z
 
 def search_movie(user):
     '''
@@ -194,19 +200,32 @@ def search_movie(user):
     
     global connection, cursor
 
+    connection.create_function('add_throuple', 3, add_throuple)
+
     keywords = input('Enter keywords: ').split()
 
     # Gets the count of the keyword in the movie titles
     QUERY_MOVIE_TITLE = """
-    SELECT mid, title, ((LENGTH(title) - LENGTH(REPLACE(lower(title), :keyword, ''))) / LENGTH(:keyword)) as counter from movies
+    SELECT mid, title, ((LENGTH(title) - LENGTH(REPLACE(lower(title), lower(:keyword), ''))) / LENGTH(:keyword)) as counter from movies
     """
 
     # Gets the count of the keyword for all the actor names of each movie
     QUERY_NAMES = """
     SELECT m.mid, m.title, SUM(query_counter) as counter
     FROM moviePeople mp 
-        LEFT OUTER JOIN (SELECT pid, ((LENGTH(name) - LENGTH(REPLACE(lower(name), :keyword, ''))) / LENGTH(:keyword)) as query_counter from moviePeople) mpCounts USING (pid)
+        LEFT OUTER JOIN (SELECT pid, ((LENGTH(name) - LENGTH(REPLACE(lower(name), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from moviePeople) mpCounts USING (pid)
         LEFT OUTER JOIN casts c USING (pid)
+        LEFT OUTER JOIN movies m USING (mid)
+    GROUP BY m.mid
+    HAVING m.mid IS NOT NULL
+    """
+
+    # Gets the count of the keyword for all the roles of each movie
+    QUERY_ROLES = """
+    SELECT m.mid, m.title, SUM(query_counter) as counter
+    FROM casts c
+        LEFT OUTER JOIN (SELECT pid, mid, ((LENGTH(role) - LENGTH(REPLACE(lower(role), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from casts) castCounts ON (castCounts.pid = c.pid AND castCounts.mid = c.mid)
+        LEFT OUTER JOIN moviePeople mp USING (pid)
         LEFT OUTER JOIN movies m USING (mid)
     GROUP BY m.mid
     HAVING m.mid IS NOT NULL
