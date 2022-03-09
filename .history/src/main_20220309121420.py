@@ -4,22 +4,9 @@ import time
 from getpass import getpass
 from datetime import datetime
 import utils
-import sys
-
 
 connection = None
 cursor = None
-
-################# TABLES #################
-# moviePeople(pid, name, birthYear)
-# movies(mid, title, year, runtime)
-# casts(mid, pid, role)
-# recommendations(watched, recommended, score)
-# customers(cid, name, pwd)
-# sessions(sid, cid, sdate, duration)
-# watch(sid, cid, mid, duration)
-# follows(cid, pid)
-# editors(eid, pwd)
 
 
 def connect(path):
@@ -34,9 +21,13 @@ def connect(path):
     return
 
 
+
+
+
 def login():
     '''
     Returns ID of a user, and whether the user is a customer or not
+
     Keeps prompting for user credentials until a valid user is found.
     '''
     global connection, cursor
@@ -64,6 +55,7 @@ def login():
 def signup():
     '''
     Signs up a customer (their CID must be unique)
+
     Returns the ID of the customer
     '''
     global connection, cursor 
@@ -87,6 +79,36 @@ def signup():
 
     print('Signup successful! Redirecting you to System page...')
     return cid
+
+
+def end_session(cid):
+    # End the session. The user should be able to end the current session. The duration should be set
+    #  in minutes to the time passed in minutes from the time the session started until the current time.
+    #   If the customer has been watching any movies, those will end 
+    # and the duration watched will be recorded. Again the duration watched cannot exceed the duration of the movie.
+
+    
+    
+  
+
+    # if len(curSessUser) > 1:
+    #     SessTBClosed = input('')
+
+
+    curSessMovies = '''
+    SELECT mid FROM WATCH where sid = :sid AND :cid = cid AND duration < 
+
+    '''
+
+    
+
+
+
+
+
+
+    connection.commit()
+
 
 
 def system(user, cust):
@@ -124,25 +146,25 @@ def system(user, cust):
             search_movie(user)
         
         elif user_input == 'EM' and cust:
-            
-            (user)
+            end_movie(user)
             print('Ending movie...')
         
         elif user_input == 'ES' and cust:
-            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration = NULL;'''
-            cursor.execute(curSessUser, {'cid':user})
+            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration = NULL '''
+            # cursor.execute(curSessUser, {'cid':cid})
 
-            if len(curSessUser) > 1:
-                end_session(user, curSessUser)
-                print('Ending session...')
-            else:
-                print('You have no active sessions!')
+            # if len(curSessUser) > 1:
+                
+
+            # end_session(user, curSessUser)
+            print('Ending session...')
         
         elif user_input == 'AM' and not cust:
             add_movie()
-
+        
         elif user_input == 'UR' and not cust:
             update_recommendations(user)
+            print('Updating recommendation...')
         
         elif user_input == 'LO':
             print('Logging out...')
@@ -153,25 +175,6 @@ def system(user, cust):
             print('Invalid input! Type "H" for help')
 
     return 
-
-
-def create_session(cid):
-    '''
-    
-    '''
-    global connection, cursor
-
-    sid = int(datetime.now().strftime('%Y%m%d')[2:])
-
-    current_date = time.strftime("%d/%m/%y %H:%M:%S")
-    duration = None
-
-    cursor.execute('''
-    INSERT INTO sessions (sid, cid, sdate, duration) VALUES (:sid, :cid, :sdate, :duration);
-    ''', {'sid': sid, 'cid': cid, 'sdate':current_date, 'duration': duration})
-
-    #commit to save the changes
-    connection.commit()
 
 
 def search_movie(user):
@@ -189,7 +192,7 @@ def search_movie(user):
     
     On a movie screen, the customer should have the options (1) to select a cast member and follow it, and (2) to start watching the movie.
     '''
-
+    
     global connection, cursor
 
     keywords = input('Enter keywords: ').split()
@@ -365,126 +368,52 @@ def search_movie(user):
     print('Returning to main menu...')
 
 
-def start_movie(cid, sid, mid):
-    # watch(sid, cid, mid, duration)
-    global cursor, connection
 
-    check_watch = '''
-        SELECT * 
-        FROM watch 
-        WHERE cid=:cid
-            AND sid=:sid 
-            AND mid=:mid 
-            AND duration<0;
-        '''
-    if cursor.execute(check_watch, {'sid':sid, 'cid':cid, 'mid':mid}).fetchone():
-        print("You are already watching the movie!")
-        return
 
-    current = datetime.now()
-    duration = int(current.strftime("%Y%m%d%H%M%S"))
-    duration = -duration
-
-    start_watching = '''
-        INSERT INTO watch VALUES (:sid, :cid, :mid, :dur);
-    '''
-    cursor.execute(start_watching, {'sid':sid, 'cid':cid, 'mid':mid, 'dur':duration})
-    connection.commit()
-
-    return
+def start_movie(user, mid, sid):
+    print('watching movie {}!'.format(mid))    
+    pass
 
 
 def follow_cast_member(cid, pid):
-    # follows(cid, pid)
-    global cursor, connection
+    pass
 
-    check_follows = '''
-        SELECT * 
-        FROM follows 
-        WHERE cid=:cid
-            AND pid=:pid;
-        '''
-    if cursor.execute(check_follows, {'cid':cid, 'pid':pid}).fetchone():
-        print("You are already following that cast member!")
-        return
 
-    start_watching = '''
-        INSERT INTO follows VALUES (:cid, :pid);
+def end_movie(user, sid, mid):
     '''
-    cursor.execute(start_watching, {'cid':cid, 'pid':pid})
-    connection.commit()
-    return
-
-
-def end_session(user, sid):
-    # End the session. The user should be able to end the current session. The duration should be set
-    #  in minutes to the time passed in minutes from the time the session started until the current time.
-    #   If the customer has been watching any movies, those will end 
-    # and the duration watched will be recorded. Again the duration watched cannot exceed the duration of the movie.
-
-    # watch(sid, cid, mid, duration)
-    # sessions(sid, cid, sdate, duration)
-
-    end_movie(user, sid)
-
-    # CLOSE SESSION AFTER CLOSING THE MOVIE
-    find_session = '''
-        SELECT s.sdate
-        FROM sessions s
-        WHERE s.sid = :sid AND w.cid = :cid
+    Closes the movie (mid:int) being wated by the user (user:str) in session (sid:int)
     '''
-    s_date  = cursor.execute(find_session, {"sid":sid, "cid":user}).fetchone()
-
-    dt_start = datetime.strptime(s_date, "%d/%m/%y %H:%M:%S")
-    dt_current = datetime.now()
-    duration = (dt_current - dt_start).total_seconds()//60
-    
-    update_session = """
-        UPDATE sessions
-        SET duration = :dur
-        WHERE cid = :cid AND sid = :sid
-        LIMIT 1
-    """
-    cursor.execute(update_session, {"dur": duration, "cid": user, "sid": sid})
-    connection.commit()
-
-
-def end_movie(user, sid):
-    '''
-    Closes the movie (currently being watched by the user (user:str) in session (sid:int)
-    
-    Duration for a movie being watched stored as -20220603230542 = 2022/06/03, 23:05:42 = watch start time
-    >>> temp = datetime.strptime('20220603230541', "%Y%m%d%H%M%S")
-    >>> temp
-    datetime.datetime(2022, 6, 3, 23, 5, 41)
-    '''
-
     global connection, cursor
 
-    movie_watching = '''
-        SELECT w.mid, w.duration
-        FROM watch w
-        WHERE w.sid = :sid AND w.cid = :cid AND w.duration < 0;
+    # Find all 
+
+    pass
+
+
+
+
+
+def create_session(cid):
     '''
-    mid, dur = cursor.execute(movie_watching, {"sid":sid, "cid":user, "mid":mid}).fetchone()
-    if not mid:
-        return
-
-    dur = str(-dur)
-    dt_start = datetime.strptime(dur, "%Y%m%d%H%M%S") 
-    dt_current = datetime.now()
-    watch_dur = (dt_current - dt_start).total_seconds()//60
-
-    update_watch = """
-        UPDATE watch
-        SET duration = :dur
-        WHERE cid = :cid AND sid = :sid AND mid = :mid AND duration<0;
-        LIMIT 1
-    """
-    cursor.execute(update_watch, {"dur": watch_dur, "cid": user, "sid": sid, "mid":mid})
-    connection.commit()
     
-    return
+    '''
+    global connection, cursor
+
+    sid = int(datetime.now().strftime('%Y%m%d%H%M%S'))
+
+    current_date = time.strftime("%Y-%m-%d %H:%M:%S")
+    duration = None
+
+    cursor.execute('''
+    INSERT INTO sessions (sid, cid, sdate, duration) VALUES (:sid, :cid, :sdate, :duration);
+    ''', {'sid': sid, 'cid': cid, 'sdate':current_date, 'duration': duration})
+
+    #commit to save the changes
+    connection.commit()
+
+
+
+
 
 
 def add_movie():
@@ -509,11 +438,10 @@ def add_movie():
 
     # Add movie
     cursor.execute('INSERT INTO movies (mid, title, year, runtime) VALUES (?, ?, ?, ?);', (mid, title, year, runtime))
-    connection.commit()
 
-    print('Entering cast members. Press "q" to quit and finish adding cast members.')
+    print('Entering cast members. At any time, press "q" to quit and finish adding cast members.')
     while True:
-        pid = input('Cast member PID (char 4) or "q": ').upper()
+        pid = input('Cast member PID (char 4): ').upper()
         if pid == 'Q':
             print('Finishing adding cast members...')
             break
@@ -527,7 +455,7 @@ def add_movie():
 
         # Cast member exists - add role
         if data:
-            prompt = utils.get_in_list('Confirm adding cast member {}, born in {}? (Y/N) '.format(data['name'], data['birthYear']), ['Y', 'N'])
+            prompt = input('Confirm adding cast member {}, born in {}? (Y/N) '.format(data['name'], data['birthYear']))
             if prompt.upper() == 'Y':
                 role = input('Role: ')
                 cursor.execute('INSERT INTO casts (mid, pid, role) VALUES (?, ?, ?);', (mid, pid, role))
@@ -537,17 +465,20 @@ def add_movie():
                 print('Rejecting cast member...')
         else:
             # Cast member does not exist - add member
-            prompt = utils.get_in_list('Cast member not found, create a new cast member with pid {}? (Y/N) '.format(pid), ['Y', 'N'])
-            if prompt == 'y':
+            prompt = input('Cast member not found, create a new cast member with pid {}? (Y/N) '.format(pid)).upper()
+            if prompt == 'Y':
                 name = input('Name: ')
                 birthYear = input('Birth Year: ')
                 cursor.execute('INSERT INTO moviePeople VALUES (?, ?, ?);', (pid, name, birthYear))
                 connection.commit()
-                print('Cast member {} with ID {} created! You can now add it to the movie.'.format(name, pid))
+                print('Cast member {} with ID {} added! You can now add it to the movie.'.format(name, pid))
             else:
                 print('Rejecting cast member...')
 
     print('Added movie {}!'.format(title))
+
+
+
 
 def update_recommendations(user):
     '''
@@ -570,9 +501,9 @@ def update_recommendations(user):
     query =  '''
 
      SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
-    FROM
-    (
-    ( 
+ FROM
+ (
+ ( 
          SELECT w1.mid as m1, w2.mid as m2,  w1.cid as cid 
          FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
           WHERE  s1.cid = s2.cid
@@ -594,9 +525,9 @@ def update_recommendations(user):
          from recommendations r
      ) t2 
      ON (t1.m1 = t2.m1 AND t2.recommend = t1.m2)
-    )
-    GROUP BY t1.m1, t1.m2
-    ORDER BY c  DESC; 
+ )
+ GROUP BY t1.m1, t1.m2
+ ORDER BY c  DESC; 
     '''
 
     rows = ''
@@ -616,9 +547,9 @@ def update_recommendations(user):
            # print(row[0], row[1], row[2], row[3])
             input_string = f"Press 'a' for adding the movie pair to recommended list, 'u' to update score and 'd' to delete the movie pair from recommended list \nWhat do you want to do with row where movie1 = {row[0]}, movie2 = {row[1]},\n and the number of customers who have watched it within the specified time period = {row[2]}"
             if row[3] == 0:
-                input_string += f"and movie2 = {row[1]} is not in the recommended list of movie1({row[0]})?\n"
+                input_string += f"and movie2 = {row[1]} is not in the recommended list of movie1({row[0]})"
             else:
-                input_string += f"and movie2 ({row[1]})  is in the recommended list of movie1({row[0]}, with the score of {row[3]}?\n"
+                input_string += f"and movie2 ({row[1]})  is in the recommended list of movie1({row[0]}, with the score of {row[3]}"
             while True:
                 Echoice = input(input_string).lower()
                 if Echoice == 'a' or Echoice == 'd' or Echoice == 'u':
@@ -670,7 +601,7 @@ def update_recommendations(user):
                     newScore = -1
                     while True:
                         try:
-                            newScore = float(input('Enter the desired new score\n'))
+                            newScore = float(input('Whats the score you want to associate for this?'))
                             if newScore <= 0 or newScore > 1:
                                 raise ValueError('value needs to be between 0 and 1')
     
@@ -678,6 +609,7 @@ def update_recommendations(user):
                             print(e.args)
                         else:
                             break
+                    newScore = float(input('Enter the desired new score\n'))
                     cursor.execute(upQuery, {'m1': int(row[0]), 'm2': int(row[1]), 'sco': newScore})
 
 
@@ -695,25 +627,19 @@ def update_recommendations(user):
     
 
 
-
 def close_sessions(user):
     '''
     Closes all the user's sessions on log out
-    Input: user (str) - cid of the user
     '''
     global connection, cursor
+    
+    pass
 
-    getSessions = """
-        SELECT s.cid, s.sid 
-        FROM sessions s
-        WHERE s.cid = :cid AND duration = NULL;
-    """
-    userSessions = cursor.execute(getSessions, {"cid":user}).fetchall()
 
-    for session in userSessions:
-        # sessions(sid, cid, sdate, duration)
-        cid, sid = session
-        end_session(cid, sid)
+
+
+
+
 
 
 def authenticate():
@@ -735,28 +661,40 @@ def authenticate():
 
 
 # custom_path used for testing
-def main():
-    db_path = sys.argv[1] if len(sys.argv) > 1 else './public.db'
-    
-    print('Reading DB from "{}"'.format(db_path))
-    connect(db_path)
+def main(custom_path=None):
+    global connection, cursor
+
+    # uncomment once we have to present
+    # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
+    if custom_path is None:
+        db_path='./public.db'
+        connect(db_path)
+    else:
+        connect(custom_path)
 
     # open and execute tables.sql
     # ! we don't need this later on!
-    # with open("prj-tables.sql") as sql_file:
-    #     sql_as_string = sql_file.read()
-    #     cursor.executescript(sql_as_string)
-    # with open("public_data.sql") as sql_file:
-    #     sql_as_string = sql_file.read()
-    #     cursor.executescript(sql_as_string)
+    with open("prj-tables.sql") as sql_file:
+        sql_as_string = sql_file.read()
+        cursor.executescript(sql_as_string)
+
+    with open("public_data.sql") as sql_file:
+        sql_as_string = sql_file.read()
+        cursor.executescript(sql_as_string)
 
     # login page
     cid, cust = authenticate()
-
-    # main logic
+    
+    #customerSessions('ABCD')
+    # system page   
     system(cid, cust)
-    return
+
+    return 0
 
 
 if __name__ == "__main__":
     main()
+    # db_path='./proj.db'
+    # connect(db_path)
+
+    # search_movie('bced')
