@@ -205,42 +205,41 @@ def search_movie(user):
     keywords = input('Enter keywords: ').split()
 
     # Gets the count of the keyword in the movie titles
-    QUERY_MOVIE_TITLE = """
-    SELECT mid, title, ((LENGTH(title) - LENGTH(REPLACE(lower(title), lower(:keyword), ''))) / LENGTH(:keyword)) as counter from movies
-    """
-
-    # Gets the count of the keyword for all the actor names of each movie
-    QUERY_NAMES = """
-    SELECT m.mid, m.title, SUM(query_counter) as counter
-    FROM moviePeople mp 
-        LEFT OUTER JOIN (SELECT pid, ((LENGTH(name) - LENGTH(REPLACE(lower(name), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from moviePeople) mpCounts USING (pid)
-        LEFT OUTER JOIN casts c USING (pid)
-        LEFT OUTER JOIN movies m USING (mid)
-    GROUP BY m.mid
-    HAVING m.mid IS NOT NULL
-    """
-
-    # Gets the count of the keyword for all the roles of each movie
-    QUERY_ROLES = """
-    SELECT m.mid, m.title, SUM(query_counter) as counter
-    FROM casts c
-        LEFT OUTER JOIN (SELECT pid, mid, ((LENGTH(role) - LENGTH(REPLACE(lower(role), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from casts) castCounts ON (castCounts.pid = c.pid AND castCounts.mid = c.mid)
-        LEFT OUTER JOIN moviePeople mp USING (pid)
-        LEFT OUTER JOIN movies m USING (mid)
-    GROUP BY m.mid
-    HAVING m.mid IS NOT NULL
+    QUERY = """
+    SELECT titles.mid, titles.title, ifnull(counter_title, 0) + ifnull(counter_names, 0) + ifnull(counter_roles, 0) as count 
+    FROM (
+        SELECT mid, title, ((LENGTH(title) - LENGTH(REPLACE(lower(title), lower(:keyword), ''))) / LENGTH(:keyword)) 
+        AS counter_title FROM movies
+    ) titles LEFT OUTER JOIN (
+        SELECT m.mid, m.title, SUM(query_counter) as counter_names
+        FROM moviePeople mp 
+            LEFT OUTER JOIN (SELECT pid, ((LENGTH(name) - LENGTH(REPLACE(lower(name), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from moviePeople) mpCounts USING (pid)
+            LEFT OUTER JOIN casts c USING (pid)
+            LEFT OUTER JOIN movies m USING (mid)
+        GROUP BY m.mid
+        HAVING m.mid IS NOT NULL
+    ) names USING (mid) LEFT OUTER JOIN (
+        SELECT m.mid, m.title, SUM(query_counter) as counter_roles
+        FROM casts c
+            LEFT OUTER JOIN (SELECT pid, mid, ((LENGTH(role) - LENGTH(REPLACE(lower(role), lower(:keyword), ''))) / LENGTH(:keyword)) as query_counter from casts) castCounts ON (castCounts.pid = c.pid AND castCounts.mid = c.mid)
+            LEFT OUTER JOIN moviePeople mp USING (pid)
+            LEFT OUTER JOIN movies m USING (mid)
+        GROUP BY m.mid
+        HAVING m.mid IS NOT NULL
+    ) roles USING (mid)
     """
 
     for keyword in keywords:
         cursor.execute(
-            QUERY_NAMES,
+            QUERY,
             {'keyword': keyword},
         )
         data = cursor.fetchall()
         print('Movies found for {}:'.format(keyword))
         for datum in data:
-            print(datum['mid'], datum['title'], datum['counter'])
+            print(datum['mid'], datum['title'], datum['count'])
 
+    
 
 
 def start_movie(user, mid, sid):
