@@ -60,7 +60,6 @@ def login():
     return user, cust
 
 
-
 def signup():
     '''
     Signs up a customer (their CID must be unique)
@@ -87,7 +86,6 @@ def signup():
 
     print('Signup successful! Redirecting you to System page...')
     return cid
-
 
 
 def system(user, cust):
@@ -392,7 +390,6 @@ def start_movie(cid, sid, mid):
     connection.commit()
 
     return
-
 
 
 def follow_cast_member(cid, pid):
