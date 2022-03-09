@@ -127,9 +127,12 @@ def system(user, cust):
         elif user_input == 'EM' and cust:
             curSessUser = ''' SELECT lower(sid) FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
             sessionId = cursor.execute(curSessUser, {'cid':user}).fetchone()
-            print(sessionId[0])
-            end_movie(user, sessionId[0])
-            print('Ending movie...')
+            if sessionId:
+                #print(sessionId[0])
+                end_movie(user, sessionId[0])
+                print('Ending movie...')
+            else:
+                print('No current Session, hence no movie to be closed')
         
         elif user_input == 'ES' and cust:
             curSessUser = ''' SELECT lower(sid) FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
@@ -137,9 +140,10 @@ def system(user, cust):
             
 
 
-            if len(curSessUser) > 1:
+            if sessionId:
                 #print(curSessUser)
-                print(sessionId[0])
+                
+                #print(sessionId[0])
                 end_session(user, sessionId[0])
                 print('Ending session...')
             else:
@@ -349,7 +353,7 @@ def search_movie(user):
                     if prompt == 'y':
                         print('Watching {}!'.format(selected_movie[1]['title']))
                         mid = selected_movie[0]
-                        print(session['sid']) #TBD
+                     #   print(session['sid']) #TBD
                         start_movie(user, session['sid'], mid)
                     break
                 else:
@@ -360,7 +364,7 @@ def search_movie(user):
                     if prompt == '2':
                         print('Watching {}!'.format(selected_movie[1]['title']))
                         mid = selected_movie[0]
-                        print(session['sid']) #TBD
+                       # print(session['sid']) #TBD
                         start_movie(user, session['sid'], mid)
                         break
                     else:
@@ -412,8 +416,8 @@ def follow_cast_member(cid, pid):
     check_follows = '''
         SELECT * 
         FROM follows 
-        WHERE cid=:cid
-            AND pid=:pid;
+        WHERE lower(cid)=:cid
+            AND lower(pid)=:pid;
         '''
     if cursor.execute(check_follows, {'cid':cid, 'pid':pid}).fetchone():
         print("You are already following that cast member!")
@@ -436,17 +440,19 @@ def end_session(user, sid):
     # watch(sid, cid, mid, duration)
     # sessions(sid, cid, sdate, duration)
 
-    print(user, sid)
+  #  print(user, sid)
     end_movie(user, sid)
 
     # CLOSE SESSION AFTER CLOSING THE MOVIE
     find_session = '''
         SELECT s.sdate
         FROM sessions s
-        WHERE s.sid = :sid AND lower(s.cid) = :cid
+        WHERE lower(s.sid) = :sid AND lower(s.cid) = :cid
     '''
     s_date  = cursor.execute(find_session, {"sid":sid, "cid":user}).fetchone()
-    print(s_date[0])
+    if not s_date:
+        return
+    #print(s_date[0])
     s_date = s_date[0]
     dt_start = datetime.strptime(s_date, "%d/%m/%y %H:%M:%S")
     dt_current = datetime.now()
@@ -479,7 +485,7 @@ def end_movie(user, sid):
         WHERE lower(w.sid) = :sid AND lower(w.cid) = :cid AND w.duration < 0;
     '''
     mid, dur = 0,0
-    print(sid)
+    #print(sid)
     checkR = cursor.execute(movie_watching, {"sid":sid, "cid":user}).fetchone()
     if not checkR:
         print('No Movie being watched')
