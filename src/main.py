@@ -224,6 +224,7 @@ def search_movie(user):
 
     results = {}
 
+    # execute query for all keywords
     for keyword in keywords:
         cursor.execute(
             QUERY,
@@ -249,6 +250,8 @@ def search_movie(user):
         return
 
     i = 0 # keep track of where we are at the start of the list
+
+    # using a for loop to make our "more" movies loop
     while True:
         for _ in range(0,5):
             elem = sorted_results[i][1]
@@ -257,6 +260,7 @@ def search_movie(user):
             if i >= len(sorted_results):
                 break
 
+        # Different output depending on if there are more than 5 movies we can show
         if i >= len(sorted_results):
             print('Please select a movie by its index:')
             user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= i)
@@ -265,10 +269,11 @@ def search_movie(user):
             user_input = input('> ').lower()
 
         if user_input == 'more' and i < len(sorted_results):
+            # Show more results
             print('More results:')
             continue
         else:
-            # we have a valid input (digit)
+            # User selected a movie
             n = int(user_input)
             selected_movie = sorted_results[n-1]
             print('Getting info for {} ({})'.format(selected_movie[1]['title'], selected_movie[1]['year']))
@@ -312,7 +317,7 @@ def search_movie(user):
                 {'cid': user }
             )
             session = cursor.fetchone()
-            # Cast member follow or movie watch
+            # Cast member follow or movie watch (note: there are 4 cases)
             if session is None:
                 if len(cast_members) == 0:
                     # No cast memmbers, no session. Do nothing
