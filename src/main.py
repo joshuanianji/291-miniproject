@@ -30,6 +30,12 @@ def connect(path):
     cursor = connection.cursor()
     cursor.execute(' PRAGMA foreign_keys=ON; ')
 
+    prettyprint = """
+    .headers on
+    .mode column
+    """
+    cursor.execute(prettyprint)
+
     connection.commit()
     return
 
@@ -264,7 +270,7 @@ def search_movie(user):
             user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= i)
         else:
             print('Please select a movie by its index or type "more":')
-            user_input = input('> ').lower()
+            user_input = utils.get_valid_input('> ', lambda x: x.lower() == 'more' or x.isdigit() and int(x) > 0 and int(x) <= i).lower()
 
         if user_input == 'more' and i < len(sorted_results):
             # Show more results
