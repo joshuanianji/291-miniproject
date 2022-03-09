@@ -125,14 +125,14 @@ def system(user, cust):
             search_movie(user)
         
         elif user_input == 'EM' and cust:
-            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
+            curSessUser = ''' SELECT lower(sid) FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
             sessionId = cursor.execute(curSessUser, {'cid':user}).fetchone()
             print(sessionId[0])
             end_movie(user, sessionId[0])
             print('Ending movie...')
         
         elif user_input == 'ES' and cust:
-            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
+            curSessUser = ''' SELECT lower(sid) FROM SESSIONS WHERE cid = :cid AND duration IS NULL;'''
             sessionId = cursor.execute(curSessUser, {'cid':user}).fetchone()
             
 
@@ -443,7 +443,7 @@ def end_session(user, sid):
     find_session = '''
         SELECT s.sdate
         FROM sessions s
-        WHERE s.sid = :sid AND s.cid = :cid
+        WHERE s.sid = :sid AND lower(s.cid) = :cid
     '''
     s_date  = cursor.execute(find_session, {"sid":sid, "cid":user}).fetchone()
     print(s_date[0])
@@ -455,7 +455,7 @@ def end_session(user, sid):
     update_session = """
         UPDATE sessions
         SET duration = :dur
-        WHERE cid = :cid AND sid = :sid;
+        WHERE lower(cid) = :cid AND lower(sid) = :sid;
     """
     cursor.execute(update_session, {"dur": duration, "cid": user, "sid": sid})
     connection.commit()
@@ -476,7 +476,7 @@ def end_movie(user, sid):
     movie_watching = '''
         SELECT w.mid, w.duration
         FROM watch w
-        WHERE w.sid = :sid AND w.cid = :cid AND w.duration < 0;
+        WHERE lower(w.sid) = :sid AND lower(w.cid) = :cid AND w.duration < 0;
     '''
     mid, dur = 0,0
     print(sid)
@@ -496,7 +496,7 @@ def end_movie(user, sid):
     update_watch = """
         UPDATE watch
         SET duration = :dur
-        WHERE cid = :cid AND sid = :sid AND mid = :mid AND duration<0;
+        WHERE lower(cid) = :cid AND lower(sid) = :sid AND mid = :mid AND duration<0;
     """
     cursor.execute(update_watch, {"dur": watch_dur, "cid": user, "sid": sid, "mid":mid})
     connection.commit()
@@ -586,19 +586,19 @@ def update_recommendations(user):
 
     query =  '''
 
-     SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
+  SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
     FROM
     (
     ( 
-         SELECT w1.mid as m1, w2.mid as m2,  w1.cid as cid 
+         SELECT w1.mid as m1, w2.mid as m2,  lower(w1.cid) as cid 
          FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
-          WHERE  s1.cid = s2.cid
+          WHERE  lower(s1.cid) = lower(s2.cid)
 		    AND JULIANDAY('now') - JULIANDAY(s1.sdate) <= :time
 			AND JULIANDAY('now') - JULIANDAY(s2.sdate) <= :time
              AND w1.sid = s1.sid
-             AND w1.cid = s1.cid
+             AND lower(w1.cid) = lower(s1.cid)
              AND w2.sid = s2.sid
-             AND w2.cid = s2.cid
+             AND lower(w2.cid) = lower(s2.cid)
              AND w1.mid != w2.mid
              AND w1.mid = m1.mid
              AND w2.mid = m2.mid
