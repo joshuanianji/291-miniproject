@@ -1,3 +1,4 @@
+from pydoc import doc
 import sqlite3
 import time
 from getpass import getpass
@@ -312,6 +313,122 @@ def update_recommendations(user):
     The editor should be able to select a monthly, an annual or an all-time report and see a listing of movie pairs m1, m2 such that some of the customers who have watched m1, have also watched m2 within the chosen period. Any such pair should be listed with the number of customers who have watched them within the chosen period, ordered from the largest to the smallest number, and with an indicator if the pair is in the recommended list and the score. The editor should be able to select a pair and (1) add it to the recommended list (if not there already) or update its score, or (2) delete a pair from the recommended list.
     '''
     global connection, cursor
+    
+    choice =''
+    while True:
+        choice = input('Do you want to see a monthly (m), annual (a) or an all-time (at) report? ').lower()
+        if choice == 'm' or choice == 'a' or choice == 'at':
+            break
+        else:
+            print('Wrong input')
+
+
+     #if score is 0 that means movie2 is not in recommended list of movie1
+    query= ''' SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
+    FROM
+    (
+    (
+        SELECT w1.mid as m1, w2.mid as m2, strftime('%m', s1.sdate) as sdate, w1.cid as cid
+        FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
+        WHERE strftime('%m', s1.sdate) = strftime('%m', s2.sdate)
+            AND s1.cid = s2.cid
+            AND w1.sid = s1.sid
+            AND w1.cid = s1.cid
+            AND w2.sid = s2.sid
+            AND w2.cid = s2.cid
+            AND w1.mid !=  w2.mid
+            AND w1.mid = m1.mid
+            AND w2.mid = m2.mid
+            ANd 2*w1.duration > m1.runtime
+            AND 2*w2.duration > m2.runtime
+    ) t1
+    LEFT OUTER JOIN
+    (
+        SELECT r.watched as m1, r.recommended as recommend, r.score as score
+        from recommendations r
+    ) t2 
+    ON (t1.m1 = t2.m1 AND t2.recommend = t1.m2)
+    )
+    GROUP BY t1.m1, t1.m2, strftime('%m', t1.sdate)
+    ORDER BY c  DESC; '''
+
+
+    qery2 = '''
+     SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
+ FROM
+ (
+ (
+         SELECT w1.mid as m1, w2.mid as m2, strftime('%Y', s1.sdate) as sdate, w1.cid as cid
+         FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
+         WHERE strftime('%Y', s1.sdate) = strftime('%Y', s2.sdate)
+             AND s1.cid = s2.cid
+             AND w1.sid = s1.sid
+             AND w1.cid = s1.cid
+             AND w2.sid = s2.sid
+             AND w2.cid = s2.cid
+             AND w1.mid != w2.mid
+             AND w1.mid = m1.mid
+             AND w2.mid = m2.mid
+             ANd 2*w1.duration >= m1.runtime
+             AND 2*w2.duration >=m2.runtime
+     ) t1
+     LEFT OUTER JOIN
+     (
+        SELECT r.watched as m1, r.recommended as recommend, r.score as score
+         from recommendations r
+     ) t2 
+     ON (t1.m1 = t2.m1 AND t2.recommend = t1.m2)
+ )
+ GROUP BY t1.m1, t1.m2, strftime('%Y', t1.sdate)
+ ORDER BY c  DESC;
+    '''
+
+    #if score is 0 that means movie2 is not in recommended list of movie1
+    allTimeQuery =  '''
+   SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
+ FROM
+ (
+ ( 
+         SELECT w1.mid as m1, w2.mid as m2,  w1.cid as cid 
+         FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
+          WHERE  s1.cid = s2.cid
+             AND w1.sid = s1.sid
+             AND w1.cid = s1.cid
+             AND w2.sid = s2.sid
+             AND w2.cid = s2.cid
+             AND w1.mid != w2.mid
+             AND w1.mid = m1.mid
+             AND w2.mid = m2.mid
+             ANd 2*w1.duration >= m1.runtime
+             AND 2*w2.duration >=m2.runtime
+     ) t1
+     LEFT OUTER JOIN
+     (
+        SELECT r.watched as m1, r.recommended as recommend, r.score as score
+         from recommendations r
+     ) t2 
+     ON (t1.m1 = t2.m1 AND t2.recommend = t1.m2)
+ )
+ GROUP BY t1.m1, t1.m2
+ ORDER BY c  DESC;'''
+
+    query2 = '''
+    SELECT * FROM sessions'''
+    rows = ''
+    if (choice == 'm'):
+        k = 'm'
+        rows = cursor.execute(query).fetchall()
+    elif choice == 'a':
+        k = 'Y'
+        rows = cursor.execute(qery2).fetchall()
+    else:
+        rows = cursor.execute(allTimeQuery).fetchall()
+    for row in rows:
+        print(row[0], row[1], row[2], row[3])
+    #Have to work on rest of the functionality for 
+    
+
+
 
     
 
@@ -356,7 +473,7 @@ def main(custom_path=None):
     # uncomment once we have to present
     # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
     if custom_path is None:
-        db_path='./proj.db'
+        db_path='./public.db'
         connect(db_path)
     else:
         connect(custom_path)
