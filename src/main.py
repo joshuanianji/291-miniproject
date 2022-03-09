@@ -193,8 +193,34 @@ def search_movie(user):
     '''
     
     global connection, cursor
-    pass
 
+    keywords = input('Enter keywords: ').split()
+
+    # Gets the count of the keyword in the movie titles
+    QUERY_MOVIE_TITLE = """
+    SELECT mid, title, ((LENGTH(title) - LENGTH(REPLACE(lower(title), :keyword, ''))) / LENGTH(:keyword)) as counter from movies
+    """
+
+    # Gets the count of the keyword for all the actor names of each movie
+    QUERY_NAMES = """
+    SELECT m.mid, m.title, SUM(query_counter) as counter
+    FROM moviePeople mp 
+        LEFT OUTER JOIN (SELECT pid, ((LENGTH(name) - LENGTH(REPLACE(lower(name), :keyword, ''))) / LENGTH(:keyword)) as query_counter from moviePeople) mpCounts USING (pid)
+        LEFT OUTER JOIN casts c USING (pid)
+        LEFT OUTER JOIN movies m USING (mid)
+    GROUP BY m.mid
+    HAVING m.mid IS NOT NULL
+    """
+
+    for keyword in keywords:
+        cursor.execute(
+            QUERY_NAMES,
+            {'keyword': keyword},
+        )
+        data = cursor.fetchall()
+        print('Movies found for {}:'.format(keyword))
+        for datum in data:
+            print(datum['mid'], datum['title'], datum['counter'])
 
 
 
@@ -371,4 +397,7 @@ def main(custom_path=None):
 
 
 if __name__ == "__main__":
-    main()
+    db_path='./proj.db'
+    connect(db_path)
+
+    search_movie('bced')
