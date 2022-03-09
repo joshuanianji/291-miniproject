@@ -280,7 +280,7 @@ def search_movie(user):
             QUERY = """
             SELECT name, role, mp.pid 
                 FROM moviePeople mp
-                LEFT OUTER JOIN casts c USING (pid)
+                LEFT OUTER JOIN casts c ON (lower(c.pid) = lower(mp.pid))
                 LEFT OUTER JOIN movies m USING (mid)
                 WHERE m.mid = :mid
             """
@@ -540,7 +540,7 @@ def add_movie():
             prompt = utils.get_in_list('Cast member not found, create a new cast member with pid {}? (Y/N) '.format(pid), ['Y', 'N'])
             if prompt == 'y':
                 name = input('Name: ')
-                birthYear = input('Birth Year: ')
+                birthYear = utils.get_valid_int('Birth Year: ')
                 cursor.execute('INSERT INTO moviePeople VALUES (?, ?, ?);', (pid, name, birthYear))
                 connection.commit()
                 print('Cast member {} with ID {} created! You can now add it to the movie.'.format(name, pid))
