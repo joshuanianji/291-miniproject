@@ -501,9 +501,9 @@ def update_recommendations(user):
     query =  '''
 
      SELECT t1.m1, t1.m2, COUNT(DISTINCT t1.cid) as c, IFNULL(t2.score, 0)
-    FROM
-    (
-    ( 
+ FROM
+ (
+ ( 
          SELECT w1.mid as m1, w2.mid as m2,  w1.cid as cid 
          FROM sessions s1, watch w1, movies m1, sessions s2, watch w2, movies m2
           WHERE  s1.cid = s2.cid
@@ -525,9 +525,9 @@ def update_recommendations(user):
          from recommendations r
      ) t2 
      ON (t1.m1 = t2.m1 AND t2.recommend = t1.m2)
-    )
-    GROUP BY t1.m1, t1.m2
-    ORDER BY c  DESC; 
+ )
+ GROUP BY t1.m1, t1.m2
+ ORDER BY c  DESC; 
     '''
 
     rows = ''
@@ -547,9 +547,9 @@ def update_recommendations(user):
            # print(row[0], row[1], row[2], row[3])
             input_string = f"Press 'a' for adding the movie pair to recommended list, 'u' to update score and 'd' to delete the movie pair from recommended list \nWhat do you want to do with row where movie1 = {row[0]}, movie2 = {row[1]},\n and the number of customers who have watched it within the specified time period = {row[2]}"
             if row[3] == 0:
-                input_string += f"and movie2 = {row[1]} is not in the recommended list of movie1({row[0]})?\n"
+                input_string += f"and movie2 = {row[1]} is not in the recommended list of movie1({row[0]})"
             else:
-                input_string += f"and movie2 ({row[1]})  is in the recommended list of movie1({row[0]}, with the score of {row[3]}?\n"
+                input_string += f"and movie2 ({row[1]})  is in the recommended list of movie1({row[0]}, with the score of {row[3]}"
             while True:
                 Echoice = input(input_string).lower()
                 if Echoice == 'a' or Echoice == 'd' or Echoice == 'u':
@@ -560,14 +560,13 @@ def update_recommendations(user):
                 if row[3] != 0:
                     print('movie pair is already in recommended list\n')
                 else:
-                    score = -1
                     while True:
                         try:
                             score = float(input('Whats the score you want to associate for this?'))
                             if score <= 0 or score > 1:
                                 raise ValueError('value needs to be between 0 and 1')
     
-                        except Exception as e:
+                        except ValueError as e:
                             print(e.args)
                         else:
                             break
@@ -598,17 +597,7 @@ def update_recommendations(user):
                     SET score = :sco
                     WHERE watched = :m1 AND recommended = :m2;
                     '''
-                    newScore = -1
-                    while True:
-                        try:
-                            newScore = float(input('Enter the desired new score\n'))
-                            if newScore <= 0 or newScore > 1:
-                                raise ValueError('value needs to be between 0 and 1')
-    
-                        except Exception as e:
-                            print(e.args)
-                        else:
-                            break
+                    newScore = float(input('Enter the desired new score\n'))
                     cursor.execute(upQuery, {'m1': int(row[0]), 'm2': int(row[1]), 'sco': newScore})
 
 
@@ -673,13 +662,13 @@ def main(custom_path=None):
 
     # open and execute tables.sql
     # ! we don't need this later on!
-    # with open("prj-tables.sql") as sql_file:
-    #     sql_as_string = sql_file.read()
-    #     cursor.executescript(sql_as_string)
+    with open("prj-tables.sql") as sql_file:
+        sql_as_string = sql_file.read()
+        cursor.executescript(sql_as_string)
 
-    # with open("public_data.sql") as sql_file:
-    #     sql_as_string = sql_file.read()
-    #     cursor.executescript(sql_as_string)
+    with open("public_data.sql") as sql_file:
+        sql_as_string = sql_file.read()
+        cursor.executescript(sql_as_string)
 
     # login page
     cid, cust = authenticate()

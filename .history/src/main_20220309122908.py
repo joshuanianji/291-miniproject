@@ -547,9 +547,9 @@ def update_recommendations(user):
            # print(row[0], row[1], row[2], row[3])
             input_string = f"Press 'a' for adding the movie pair to recommended list, 'u' to update score and 'd' to delete the movie pair from recommended list \nWhat do you want to do with row where movie1 = {row[0]}, movie2 = {row[1]},\n and the number of customers who have watched it within the specified time period = {row[2]}"
             if row[3] == 0:
-                input_string += f"and movie2 = {row[1]} is not in the recommended list of movie1({row[0]})?\n"
+                input_string += f"and movie2 = {row[1]} is not in the recommended list of movie1({row[0]})"
             else:
-                input_string += f"and movie2 ({row[1]})  is in the recommended list of movie1({row[0]}, with the score of {row[3]}?\n"
+                input_string += f"and movie2 ({row[1]})  is in the recommended list of movie1({row[0]}, with the score of {row[3]}"
             while True:
                 Echoice = input(input_string).lower()
                 if Echoice == 'a' or Echoice == 'd' or Echoice == 'u':
