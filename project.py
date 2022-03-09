@@ -214,6 +214,60 @@ def search_movie(user):
 
 
 
+def start_movie(cid, sid, mid):
+    # watch(sid, cid, mid, duration)
+    global cursor, connection
+
+    check_watch = '''
+        SELECT * 
+        FROM watch 
+        WHERE cid=:cid
+            AND sid=:sid 
+            AND mid=:mid 
+            AND duration<0;
+        '''
+    if cursor.execute(check_watch, {'sid':sid, 'cid':cid, 'mid':mid}).fetchone():
+        print("You are already watching the movie!")
+        return
+
+    current = datetime.now()
+    duration = int(current.strftime("%Y%m%d%H%M%S"))
+    duration = -duration
+
+    start_watching = '''
+        INSERT INTO watch VALUES (:sid, :cid, :mid, :dur);
+    '''
+    cursor.execute(start_watching, {'sid':sid, 'cid':cid, 'mid':mid, 'dur':duration})
+    connection.commit()
+
+    return
+
+
+
+
+def follow_cast_member(cid, pid):
+    # follows(cid, pid)
+    global cursor, connection
+
+    check_follows = '''
+        SELECT * 
+        FROM follows 
+        WHERE cid=:cid
+            AND pid=:pid;
+        '''
+    if cursor.execute(check_watch, {'cid':cid, 'pid':pid}).fetchone():
+        print("You are already following that cast member!")
+        return
+
+    start_watching = '''
+        INSERT INTO follows VALUES (:cid, :pid);
+    '''
+    cursor.execute(start_watching, {'cid':cid, 'pid':pid})
+    connection.commit()
+    return
+
+
+
 
 def end_session(user, sid):
     # End the session. The user should be able to end the current session. The duration should be set
@@ -262,7 +316,6 @@ def end_movie(user, sid):
 
     global connection, cursor
 
-
     movie_watching = '''
         SELECT w.mid, w.duration
         FROM watch w
@@ -293,7 +346,8 @@ def end_movie(user, sid):
 
 def add_movie():
     '''
-    The editor should be able to add a movie by providing a unique movie id, a title, a year, a runtime and a list of cast members and their roles. To add a cast member, the editor will enter the id of the cast member, and your system will look up the member and will display the name and the birth year. The editor can confirm and provide the cast member role or reject the cast member. If the cast member does not exist, the editor should be able to add the member by providing a unique id, a name and a birth year.
+    The editor should be able to add a movie by providing a unique movie id, a title, a year, a runtime and a list of cast members and their roles. To add a cast member, the editor will enter the id of the cast member, and your system will look up the member and will display the name and the birth year. The editor can confirm and provide the cast member role or reject the cast member. 
+    If the cast member does not exist, the editor should be able to add the member by providing a unique id, a name and a birth year.
     '''
     global connection, cursor
 
@@ -408,9 +462,7 @@ def main():
             print('Invalid input! Press "L" to login and "S" to signup')
 
 
-
-    #customerSessions('ABCD')
-    # system page   
+    # system page
     system(cid, cust)
 
     return 0
