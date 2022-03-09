@@ -230,7 +230,6 @@ def search_movie(user):
             {'keyword': keyword},
         )
         data = cursor.fetchall()
-        print('Movies found for {}:'.format(keyword))
         for datum in data:
             # OHHH YEAH THIS CODE MAKES ME WANT TO CRY
             try:
@@ -242,36 +241,37 @@ def search_movie(user):
                     'year': datum['year'],
                     'runtime': datum['runtime'],
                 }
-
-        print('Intermediate results: {}'.format(results))
     
     sorted_results = sorted(results.items(), key=lambda x: x[1]['count'], reverse=True)
 
+    if len(sorted_results) == 0:
+        print('No results found')
+        return
+
     i = 0 # keep track of where we are at the start of the list
     while True:
-        start = i
         for _ in range(0,5):
             elem = sorted_results[i][1]
-            print('{}: {} ({}): {}min'.format(i, elem['title'], elem['year'], elem['runtime']))
+            print('{}: {} ({}): {}min'.format(i + 1, elem['title'], elem['year'], elem['runtime']))
             i += 1
             if i >= len(sorted_results):
                 break
-        end = i
 
         if i >= len(sorted_results):
             print('Please select a movie by its index:')
-            user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) <= start and int(x) <= end - 1)
+            user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= i)
         else:
             print('Please select a movie by its index or type "more":')
-            user_input = input('> ')
+            user_input = input('> ').lower()
 
-        if user_input == 'MORE' and i < len(sorted_results):
+        if user_input == 'more' and i < len(sorted_results):
             print('More results:')
             continue
         else:
             # we have a valid input (digit)
             n = int(user_input)
-            print('Getting info for {}'.format(sorted_results[n][1]['title']))
+            selected_movie = sorted_results[n-1]
+            print('Getting info for {} ({})'.format(selected_movie[1]['title'], selected_movie[1]['year']))
 
             # get all cast members of the movie
             QUERY = """
@@ -283,12 +283,15 @@ def search_movie(user):
             """
             cursor.execute(
                 QUERY,
-                {'mid': sorted_results[n][0]},
+                {'mid': selected_movie[0]},
             )
             cast_members = cursor.fetchall()
             print('Cast members:')
             for cast_member in cast_members:
                 print('{} as {}'.format(cast_member['name'], cast_member['role']))
+            
+            if len(cast_members) == 0:
+                print('No cast members found')
             
             # get the number of customers who have watched the movie (watched over 50% of it)
             QUERY = """
@@ -298,30 +301,66 @@ def search_movie(user):
             """
             cursor.execute(
                 QUERY,
-                {'mid': sorted_results[n][0]},
+                {'mid': selected_movie[0]},
             )
             watched_count = cursor.fetchone()['count']
-            print('{} customers have watched this movie'.format(watched_count))
+            print('{} customer(s) have watched this movie'.format(watched_count))
 
-            prompt = utils.get_in_list('Type "1" to select a cast member and follow, and "2" to watch this movie', ['1', '2'])
-            if prompt == '2':
-                print('Watching {}!'.format(sorted_results[n][1]['title']))
-                mid = sorted_results[n][0]
+            # Check if the user has a session
+            cursor.execute(
+                'SELECT * FROM sessions WHERE cid=:cid AND DURATION IS NULL', 
+                {'cid': user }
+            )
+            session = cursor.fetchone()
+            # Cast member follow or movie watch
+            if session is None:
+                if len(cast_members) == 0:
+                    # No cast memmbers, no session. Do nothing
+                    print('Note: you do not have a session, so you can only select a cast member to follow. Since there are no cast members, we will return to the main menu')
+                    break
+                else:
+                    # cast members, no session
+                    print('Note: you do not have a session, so you can only select a cast member to follow. Select a cast member by its index:')
+                    for i, x in enumerate(cast_members):
+                        print('{}: {} as {}'.format(i + 1, x['name'], x['role']))
 
-                # ! check for sesion id
-                start_movie(user, mid, '')
-                break
+                    user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= len(cast_members))
+                    print('Following {}!'.format(cast_members[int(user_input) - 1]['name']))
+                    pid = cast_members[int(user_input) - 1]['pid']
+                    follow_cast_member(user, pid)
+                    break
             else:
-                print('Select a cast member by the index:')
-                for i, x in enumerate(cast_members):
-                    print('{}: {} as {}'.format(i, x['name'], x['role']))
+                if len(cast_members) == 0:
+                    # No cast members, session. Can only watch the movie
+                    prompt = utils.get_in_list('Watch the movie? (y/n)', ['y', 'n'])
+                    if prompt == 'y':
+                        print('Watching {}!'.format(selected_movie[1]['title']))
+                        mid = selected_movie[0]
+                        start_movie(user, mid, session['sid'])
+                    break
+                else:
+                    # with cast members, session
+                    print('Type "1" to select a cast member and follow, and "2" to watch this movie')
+                    prompt = utils.get_in_list('> ', ['1', '2'])
+                    print('Received: {}'.format(prompt))
+                    if prompt == '2':
+                        print('Watching {}!'.format(selected_movie[1]['title']))
+                        mid = selected_movie[0]
+                        start_movie(user, mid, session['sid'])
+                        break
+                    else:
+                        print('Select a cast member by the index:')
+                        for i, x in enumerate(cast_members):
+                            print('{}: {} as {}'.format(i + 1, x['name'], x['role']))
 
-                user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) <= len(cast_members))
-                print('Following {}!'.format(cast_members[int(user_input)]['name']))
-                pid = cast_members[int(user_input)]['pid']
-                follow_cast_member(user, pid)
-                break
-        
+                        user_input = utils.get_valid_input('> ', lambda x: x.isdigit() and int(x) > 0 and int(x) <= len(cast_members))
+                        print('Following {}!'.format(cast_members[int(user_input) - 1]['name']))
+                        pid = cast_members[int(user_input) - 1]['pid']
+                        follow_cast_member(user, pid)
+                        break
+
+    print('Returning to main menu...')
+
 
 
 
