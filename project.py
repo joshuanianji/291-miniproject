@@ -6,7 +6,16 @@ from datetime import datetime
 connection = None
 cursor = None
 
-
+################# TABLES #################
+# moviePeople(pid, name, birthYear)
+# movies(mid, title, year, runtime)
+# casts(mid, pid, role)
+# recommendations(watched, recommended, score)
+# customers(cid, name, pwd)
+# sessions(sid, cid, sdate, duration)
+# watch(sid, cid, mid, duration)
+# follows(cid, pid)
+# editors(eid, pwd)
 
 
 
@@ -66,7 +75,7 @@ def signup():
     print('Welcome to the Movies291 signup page! Please enter your credentials you wish to use')
     
     while True:
-        cid = input('ID: ').upper()
+        cid = input('ID: ').lower()
 
         if len(cid) != 4:
             print('Please input an ID that is exactly 4 characters.')
@@ -131,7 +140,7 @@ def system(user, cust):
             print('Ending movie...')
         
         elif user_input == 'ES' and cust:
-            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration = NULL '''
+            curSessUser = ''' SELECT sid FROM SESSIONS WHERE cid = :cid AND duration = NULL;'''
             cursor.execute(curSessUser, {'cid':cid})
 
             if len(curSessUser) > 1:
@@ -197,8 +206,9 @@ def search_movie(user):
     
     On a movie screen, the customer should have the options (1) to select a cast member and follow it, and (2) to start watching the movie.
     '''
-    
     global connection, cursor
+    
+    
     pass
 
 
@@ -211,51 +221,72 @@ def end_session(user, sid):
     #   If the customer has been watching any movies, those will end 
     # and the duration watched will be recorded. Again the duration watched cannot exceed the duration of the movie.
 
-    curSessMovies = '''
-        SELECT * 
-        FROM watch w, movies m 
-        WHERE sid = :sid AND :cid = cid 
+    # watch(sid, cid, mid, duration)
+    # sessions(sid, cid, sdate, duration)
+
+    end_movie(user, sid)
+
+    # CLOSE SESSION AFTER CLOSING THE MOVIE
+    find_session = '''
+        SELECT s.sdate
+        FROM sessions s
+        WHERE s.sid = :sid AND w.cid = :cid
     '''
-    mov_watched = cursor.execute(curSessMovies, {"sid":sid, "cid":user})
+    s_date  = cursor.execute(curSessMovies, {"sid":sid, "cid":user, "mid":mid}).fetchone()
 
-
-
-
-    # CODE TO CLOSE SESSION AFTER CLOSING THE MOVIE
+    dt_start = datetime.strptime(s_date, "%d/%m/%y %H:%M:%S")
+    dt_current = datetime.now()
+    duration = (dt_current - dt_start).total_seconds()//60
     
-    # sid, s_date = session[0], session[2]
-    # initial_datetime = datetime.strptime(s_date, "%d/%m/%y %H:%M:%S")
-    # current_datetime = datetime.now()
-    # duration = (current_datetime - initial_datetime).total_seconds()//60
-    
-    # update_session = """
-    #     UPDATE sessions
-    #     SET duration = :dur
-    #     WHERE cid = :cid AND sid = :sid
-    #     LIMIT 1
-    # """
-    # cursor.execute(update_session, {"dur": duration, "cid": user, "sid": sid})
-    # cursor.commit()
-
-
-
-
-
-
+    update_session = """
+        UPDATE sessions
+        SET duration = :dur
+        WHERE cid = :cid AND sid = :sid
+        LIMIT 1
+    """
+    cursor.execute(update_session, {"dur": duration, "cid": user, "sid": sid})
     connection.commit()
 
 
 
 
-def end_movie(user, sid, mid):
+def end_movie(user, sid):
     '''
-    Closes the movie (mid:int) being watched by the user (user:str) in session (sid:int)
+    Closes the movie (currently being watched by the user (user:str) in session (sid:int)
+    
+    Duration for a movie being watched stored as -20220603230542 = 2022/06/03, 23:05:42 = watch start time
+    >>> temp = datetime.strptime('20220603230541', "%Y%m%d%H%M%S")
+    >>> temp
+    datetime.datetime(2022, 6, 3, 23, 5, 41)
     '''
+
     global connection, cursor
 
-    # Find all 
 
-    pass
+    movie_watching = '''
+        SELECT w.mid, w.duration
+        FROM watch w
+        WHERE w.sid = :sid AND w.cid = :cid AND w.duration < 0;
+    '''
+    mid, dur = cursor.execute(movie_watching, {"sid":sid, "cid":user, "mid":mid}).fetchone()
+    if not mid:
+        return
+
+    dur = str(-dur)
+    dt_start = datetime.strptime(dur, "%Y%m%d%H%M%S") 
+    dt_current = datetime.now()
+    watch_dur = (dt_current - dt_start).total_seconds()//60
+
+    update_watch = """
+        UPDATE watch
+        SET duration = :dur
+        WHERE cid = :cid AND sid = :sid AND mid = :mid AND duration<0;
+        LIMIT 1
+    """
+    cursor.execute(update_watch, {"dur": watch_dur, "cid": user, "sid": sid, "mid":mid})
+    connection.commit()
+    
+    return
 
 
 
@@ -280,7 +311,7 @@ def add_movie():
             break
         
         # look up member id 
-        cursor.execute('SELECT * FROM casts c, moviePeople mp WHERE c.mid=? AND c.pid = mp.pid', (mid,))
+        cursor.execute('SELECT * FROM casts c, moviePeople mp WHERE c.mid=? AND c.pid = mp.pid;', (mid,))
         data = cursor.fetchone()
 
         # Cast member exists - add role
