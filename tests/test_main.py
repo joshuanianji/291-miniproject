@@ -39,12 +39,13 @@ class TestMain(unittest.TestCase):
         self.patcher4.stop()
 
     # Testing main file
+    @patch('sys.argv', ['main.py', './test.db'])
     def test_main(self):
 
         # check print statemenets in mock_main
         self.mock_authenticate.return_value = 'bced', True # editor
 
-        main.main('./test.db')
+        main.main()
 
         self.mock_connect.assert_called_once_with('./test.db')
         self.mock_authenticate.assert_called_once()

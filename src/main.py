@@ -4,6 +4,7 @@ import time
 from getpass import getpass
 from datetime import datetime
 import utils
+import sys
 
 connection = None
 cursor = None
@@ -19,9 +20,6 @@ def connect(path):
 
     connection.commit()
     return
-
-
-
 
 
 def login():
@@ -192,7 +190,7 @@ def search_movie(user):
     
     On a movie screen, the customer should have the options (1) to select a cast member and follow it, and (2) to start watching the movie.
     '''
-    
+
     global connection, cursor
 
     keywords = input('Enter keywords: ').split()
@@ -438,10 +436,11 @@ def add_movie():
 
     # Add movie
     cursor.execute('INSERT INTO movies (mid, title, year, runtime) VALUES (?, ?, ?, ?);', (mid, title, year, runtime))
+    connection.commit()
 
-    print('Entering cast members. At any time, press "q" to quit and finish adding cast members.')
+    print('Entering cast members. Press "q" to quit and finish adding cast members.')
     while True:
-        pid = input('Cast member PID (char 4): ').upper()
+        pid = input('Cast member PID (char 4) or "q": ').upper()
         if pid == 'Q':
             print('Finishing adding cast members...')
             break
@@ -455,7 +454,7 @@ def add_movie():
 
         # Cast member exists - add role
         if data:
-            prompt = input('Confirm adding cast member {}, born in {}? (Y/N) '.format(data['name'], data['birthYear']))
+            prompt = utils.get_in_list('Confirm adding cast member {}, born in {}? (Y/N) '.format(data['name'], data['birthYear']), ['Y', 'N'])
             if prompt.upper() == 'Y':
                 role = input('Role: ')
                 cursor.execute('INSERT INTO casts (mid, pid, role) VALUES (?, ?, ?);', (mid, pid, role))
@@ -465,13 +464,13 @@ def add_movie():
                 print('Rejecting cast member...')
         else:
             # Cast member does not exist - add member
-            prompt = input('Cast member not found, create a new cast member with pid {}? (Y/N) '.format(pid)).upper()
-            if prompt == 'Y':
+            prompt = utils.get_in_list('Cast member not found, create a new cast member with pid {}? (Y/N) '.format(pid), ['Y', 'N'])
+            if prompt == 'y':
                 name = input('Name: ')
                 birthYear = input('Birth Year: ')
                 cursor.execute('INSERT INTO moviePeople VALUES (?, ?, ?);', (pid, name, birthYear))
                 connection.commit()
-                print('Cast member {} with ID {} added! You can now add it to the movie.'.format(name, pid))
+                print('Cast member {} with ID {} created! You can now add it to the movie.'.format(name, pid))
             else:
                 print('Rejecting cast member...')
 
@@ -660,16 +659,11 @@ def authenticate():
 
 
 # custom_path used for testing
-def main(custom_path=None):
-    global connection, cursor
-
-    # uncomment once we have to present
-    # db_path = input('Enter DB path: (e.g. ./prj-tables.db): ')
-    if custom_path is None:
-        db_path='./public.db'
-        connect(db_path)
-    else:
-        connect(custom_path)
+def main():
+    db_path = sys.argv[1] if len(sys.argv) > 1 else './public.db'
+    
+    print('Reading DB from "{}"'.format(db_path))
+    connect(db_path)
 
     # open and execute tables.sql
     # ! we don't need this later on!
@@ -683,17 +677,11 @@ def main(custom_path=None):
 
     # login page
     cid, cust = authenticate()
-    
-    #customerSessions('ABCD')
-    # system page   
-    system(cid, cust)
 
-    return 0
+    # main logic
+    system(cid, cust)
+    return
 
 
 if __name__ == "__main__":
     main()
-    # db_path='./proj.db'
-    # connect(db_path)
-
-    # search_movie('bced')
