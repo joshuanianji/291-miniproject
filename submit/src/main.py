@@ -125,7 +125,7 @@ def system(user, cust):
         
         elif user_input == 'EM' and cust:
             
-            end_movie(user)
+            (user)
             print('Ending movie...')
         
         elif user_input == 'ES' and cust:
@@ -133,7 +133,6 @@ def system(user, cust):
             cursor.execute(curSessUser, {'cid':user})
 
             if len(curSessUser) > 1:
-                print(curSessUser)
                 end_session(user, curSessUser)
                 print('Ending session...')
             else:
@@ -196,7 +195,6 @@ def search_movie(user):
     keywords = input('Enter keywords: ').split()
 
     # Gets the count of the keyword in the movie titles
-    # https://stackoverflow.com/a/12344881
     QUERY = """
     SELECT titles.mid, titles.title, m.year, m.runtime, ifnull(counter_title, 0) + ifnull(counter_names, 0) + ifnull(counter_roles, 0) as count 
     FROM (
@@ -341,7 +339,6 @@ def search_movie(user):
                     if prompt == 'y':
                         print('Watching {}!'.format(selected_movie[1]['title']))
                         mid = selected_movie[0]
-                        print(session['sid']) #TBD
                         start_movie(user, session['sid'], mid)
                     break
                 else:
@@ -352,7 +349,6 @@ def search_movie(user):
                     if prompt == '2':
                         print('Watching {}!'.format(selected_movie[1]['title']))
                         mid = selected_movie[0]
-                        print(session['sid']) #TBD
                         start_movie(user, session['sid'], mid)
                         break
                     else:
@@ -435,7 +431,7 @@ def end_session(user, sid):
     find_session = '''
         SELECT s.sdate
         FROM sessions s
-        WHERE s.sid = :sid AND s.cid = :cid
+        WHERE s.sid = :sid AND w.cid = :cid
     '''
     s_date  = cursor.execute(find_session, {"sid":sid, "cid":user}).fetchone()
 
@@ -470,14 +466,9 @@ def end_movie(user, sid):
         FROM watch w
         WHERE w.sid = :sid AND w.cid = :cid AND w.duration < 0;
     '''
-    mid, dur = 0,0
-    checkR = cursor.execute(movie_watching, {"sid":sid, "cid":user}).fetchone()
-    if not checkR:
-        print('No Movie being watched')
+    mid, dur = cursor.execute(movie_watching, {"sid":sid, "cid":user, "mid":mid}).fetchone()
+    if not mid:
         return
-    else:
-        mid, dur = checkR
-
 
     dur = str(-dur)
     dt_start = datetime.strptime(dur, "%Y%m%d%H%M%S") 
@@ -750,14 +741,14 @@ def main():
     print('Reading DB from "{}"'.format(db_path))
     connect(db_path)
 
-   # open and execute tables.sql
-   # ! we don't need this later on!
-    with open("prj-tables.sql") as sql_file:
-        sql_as_string = sql_file.read()
-        cursor.executescript(sql_as_string)
-    with open("public_data.sql") as sql_file:
-        sql_as_string = sql_file.read()
-        cursor.executescript(sql_as_string)
+    # open and execute tables.sql
+    # ! we don't need this later on!
+    # with open("prj-tables.sql") as sql_file:
+    #     sql_as_string = sql_file.read()
+    #     cursor.executescript(sql_as_string)
+    # with open("public_data.sql") as sql_file:
+    #     sql_as_string = sql_file.read()
+    #     cursor.executescript(sql_as_string)
 
     # login page
     cid, cust = authenticate()
