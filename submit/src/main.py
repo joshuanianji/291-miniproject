@@ -195,7 +195,6 @@ def search_movie(user):
     keywords = input('Enter keywords: ').split()
 
     # Gets the count of the keyword in the movie titles
-    # https://stackoverflow.com/a/12344881
     QUERY = """
     SELECT titles.mid, titles.title, m.year, m.runtime, ifnull(counter_title, 0) + ifnull(counter_names, 0) + ifnull(counter_roles, 0) as count 
     FROM (
