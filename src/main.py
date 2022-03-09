@@ -161,7 +161,7 @@ def create_session(cid):
     '''
     global connection, cursor
 
-    sid = int(datetime.now().strftime('%Y%m%d')[2:])
+    sid = int(datetime.now().strftime('%Y%m%d%H%M%S'))
 
     current_date = time.strftime("%d/%m/%y %H:%M:%S")
     duration = None
