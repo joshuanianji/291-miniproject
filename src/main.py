@@ -294,7 +294,7 @@ def search_movie(user):
             QUERY = """
             SELECT name, role, mp.pid 
                 FROM moviePeople mp
-                LEFT OUTER JOIN casts c USING (pid)
+                LEFT OUTER JOIN casts c ON (lower(c.pid) = lower(mp.pid))
                 LEFT OUTER JOIN movies m USING (mid)
                 WHERE m.mid = :mid
             """
@@ -765,15 +765,6 @@ def main():
     
     print('Reading DB from "{}"'.format(db_path))
     connect(db_path)
-
-   # open and execute tables.sql
-   # ! we don't need this later on!
-    with open("prj-tables.sql") as sql_file:
-        sql_as_string = sql_file.read()
-        cursor.executescript(sql_as_string)
-    with open("public_data.sql") as sql_file:
-        sql_as_string = sql_file.read()
-        cursor.executescript(sql_as_string)
 
     # login page
     cid, cust = authenticate()
